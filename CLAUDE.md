@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Claude Grid is an IntelliJ Platform plugin (Kotlin) that hosts several `claude` CLI sessions side by side in a "Claude Grid" sidebar tool window, using the IDE's own terminal widget. `plan.md` is the build plan and the source of truth for phases, progress, and the **Decisions log**; keep it updated (tick off phases, record decisions) when you change behavior.
+Claude Grid is an IntelliJ Platform plugin (Kotlin) that hosts several `claude` CLI sessions side by side in a "Claude Grid" sidebar tool window, using the IDE's own terminal widget.
 
 ## Commands
 
@@ -16,7 +16,7 @@ Claude Grid is an IntelliJ Platform plugin (Kotlin) that hosts several `claude` 
 
 There are no tests yet (the test framework `TestFrameworkType.Platform` is configured, so `./gradlew test` / `./gradlew test --tests '<FQN>'` will work once tests exist under `src/test/kotlin`).
 
-Working rule from `plan.md`: after every change run `./gradlew buildPlugin`, then ask the user to test via `./gradlew runIde`.
+Working rule: after every change run `./gradlew buildPlugin`, then ask the user to test via `./gradlew runIde`.
 
 ## Build environment
 
@@ -40,11 +40,11 @@ Package `dev.claudegrid`:
 
 ### Terminal API (Reworked Terminal, `@ApiStatus.Experimental`)
 
-Create a tab via `TerminalToolWindowTabsManager.createTabBuilder()...createTab()`, then `detachTab(tab)` and embed `tab.view.component`; send commands with `tab.view.createSendTextBuilder().shouldExecute().send(..)`; watch `tab.view.sessionState` for `Terminated`; dispose via `Disposer.dispose(tab.content)`. The internal fallback `shouldAddToToolWindow(false)` exists but should only be used if detaching misbehaves. Full rationale in `plan.md`.
+Create a tab via `TerminalToolWindowTabsManager.createTabBuilder()...createTab()`, then `detachTab(tab)` and embed `tab.view.component`; send commands with `tab.view.createSendTextBuilder().shouldExecute().send(..)`; watch `tab.view.sessionState` for `Terminated`; dispose via `Disposer.dispose(tab.content)`. The internal fallback `shouldAddToToolWindow(false)` exists but should only be used if detaching misbehaves. Chosen over the classic `TerminalToolWindowManager` / `ShellTerminalWidget` path because Reworked is the default engine in 2026.2.
 
 ### Session identity and naming
 
-- Each session gets a UUID passed as `claude --session-id <id>`; restore runs `claude --resume <id> || claude --session-id <id>` (not `--continue`, which would make all sessions in one directory resume the same conversation). The id is also exported as `CLAUDE_GRID_SESSION` (intended for the Phase 4 hook-driven status dots).
+- Each session gets a UUID passed as `claude --session-id <id>`; restore runs `claude --resume <id> || claude --session-id <id>` (not `--continue`, which would make all sessions in one directory resume the same conversation). The id is also exported as `CLAUDE_GRID_SESSION` (intended for planned hook-driven status dots per pane).
 - New sessions are named `CLAUDE <n>` (lowest free n) and then follow Claude Code's terminal title (OSC 0, read via `TerminalView.title.applicationTitle` in `compat/`). A manual rename pins the name (`autoName = false`); renaming to empty switches back to automatic.
 
 ### Shortcuts inside the terminal
@@ -53,5 +53,5 @@ The terminal swallows IDE shortcuts ("Override IDE shortcuts"). Any action that 
 
 ## Constraints
 
-- Never modify the user's global `~/.claude/settings.json`; Claude Code hooks (Phase 4) go into the project's `.claude/settings.local.json`, merged after showing a diff.
+- Never modify the user's global `~/.claude/settings.json`; planned Claude Code hooks go into the project's `.claude/settings.local.json`, merged after showing a diff.
 - Avoid deprecated APIs when a supported alternative exists in the target version.
