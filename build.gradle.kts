@@ -48,6 +48,12 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.2.0</h3>
+            <ul>
+              <li>Minimize sessions to a dock below the grid: they keep running and come back instantly, without resuming.</li>
+              <li>Dock chips show a spinner while Claude works and a dot when it finished while minimized.</li>
+              <li>Minimized sessions stay minimized across IDE restarts and only resume when restored.</li>
+            </ul>
             <h3>0.1.0</h3>
             <ul>
               <li>First release: Claude Code sessions tiled in columns, rows or a grid in a sidebar tool window.</li>
