@@ -48,6 +48,13 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.3.1</h3>
+            <ul>
+              <li>Reorder panes: drag a pane's header onto another pane, or move the focused pane with
+                  Ctrl+Alt+Shift+. and Ctrl+Alt+Shift+, (also inside the terminal).</li>
+              <li>Fix restart, reload and reopen resuming the wrong conversation (or showing Claude's picker) after
+                  /resume, Claude's picker or /clear inside a pane. Panes now follow the conversation they really show.</li>
+            </ul>
             <h3>0.3.0</h3>
             <ul>
               <li>Reload a session to pick up changed settings or MCP servers: Claude restarts and resumes the same conversation.
