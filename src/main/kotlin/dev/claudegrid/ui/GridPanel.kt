@@ -124,22 +124,22 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
         }
-        fun add(c: JComponent, top: Int = 0) {
+        fun addItem(c: JComponent, top: Int = 0) {
             c.alignmentX = LEFT_ALIGNMENT
             if (top > 0) c.border = JBUI.Borders.emptyTop(top)
             box.add(c)
         }
         if (manager.minimizedSessions.isNotEmpty()) {
-            add(JBLabel("All sessions are minimized; click one below to restore it.").apply {
+            addItem(JBLabel("All sessions are minimized; click one below to restore it.").apply {
                 foreground = UIUtil.getContextHelpForeground()
                 border = JBUI.Borders.emptyBottom(16)
             })
         }
-        add(ActionLink("New Claude session") { NewSessionAction.createSession(project) }.apply { setIcon(AllIcons.General.Add) })
+        addItem(ActionLink("New Claude session") { NewSessionAction.createSession(project) }.apply { setIcon(AllIcons.General.Add) })
 
         val recent = manager.closedSessions.take(MAX_RECENT_IN_EMPTY_STATE)
         if (recent.isNotEmpty()) {
-            add(JBLabel("Recently closed").apply { foreground = UIUtil.getContextHelpForeground() }, top = 16)
+            addItem(JBLabel("Recently closed").apply { foreground = UIUtil.getContextHelpForeground() }, top = 16)
             for (s in recent) {
                 val id = s.id ?: continue
                 val row = JPanel(BorderLayout(JBUI.scale(8), 0)).apply {
@@ -150,10 +150,10 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                     }, BorderLayout.WEST)
                     add(JBLabel(describeClosedSession(s)).apply { foreground = UIUtil.getContextHelpForeground() }, BorderLayout.CENTER)
                 }
-                add(row, top = 6)
+                addItem(row, top = 6)
             }
         }
-        add(ActionLink("Resume with Claude's picker…") { manager.createSession(pickFromClaude = true) }.apply {
+        addItem(ActionLink("Resume with Claude's picker…") { manager.createSession(pickFromClaude = true) }.apply {
             setIcon(AllIcons.Actions.Search)
         }, top = 16)
         return JPanel(GridBagLayout()).apply { add(box) }
