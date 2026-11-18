@@ -1,6 +1,14 @@
 package dev.claudegrid.actions
 
+import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.Separator
+import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.project.DumbAware
+import com.intellij.util.text.DateFormatUtil
+import dev.claudegrid.state.SessionState
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbAwareToggleAction
@@ -78,3 +86,77 @@ abstract class LayoutAction(private val mode: LayoutMode) : DumbAwareToggleActio
 class LayoutColumnsAction : LayoutAction(LayoutMode.COLUMNS)
 class LayoutRowsAction : LayoutAction(LayoutMode.ROWS)
 class LayoutGridAction : LayoutAction(LayoutMode.GRID)
+
+class ReopenClosedSessionAction : ClaudeGridAction() {
+    override fun isEnabled(manager: ClaudeSessionManager) = manager.closedSessions.isNotEmpty()
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        ClaudeGridToolWindowFactory.show(project)
+        ClaudeSessionManager.getInstance(project).reopenLast()
+    }
+}
+
+class ResumeWithClaudePickerAction : ClaudeGridAction() {
+    override fun isEnabled(manager: ClaudeSessionManager) = true
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        ClaudeGridToolWindowFactory.show(project)
+        ClaudeSessionManager.getInstance(project).createSession(pickFromClaude = true)
+    }
+}
+
+class ClearRecentlyClosedAction : ClaudeGridAction() {
+    override fun isEnabled(manager: ClaudeSessionManager) = manager.closedSessions.isNotEmpty()
+    override fun actionPerformed(e: AnActionEvent) {
+        e.manager?.clearClosed()
+    }
+}
+
+/** Dropdown next to "+": recently closed sessions, Claude's own picker, clear. */
+class ResumeSessionGroup : ActionGroup(), DumbAware {
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+    override fun getChildren(e: AnActionEvent?): Array<AnAction> {
+        val manager = e?.manager ?: return AnAction.EMPTY_ARRAY
+        val am = ActionManager.getInstance()
+        val closed = manager.closedSessions.mapNotNull { s -> s.id?.let { ResumeClosedAction(it, s) } }
+        return buildList {
+            if (closed.isEmpty()) {
+                add(Separator.create("No recently closed sessions"))
+            } else {
+                add(Separator.create("Recently Closed"))
+                addAll(closed)
+            }
+            add(Separator.create())
+            add(am.getAction("ClaudeGrid.ResumeWithPicker"))
+            add(am.getAction("ClaudeGrid.ClearRecentlyClosed"))
+        }.toTypedArray()
+    }
+}
+
+private class ResumeClosedAction(private val id: String, s: SessionState) : DumbAwareAction() {
+    init {
+        templatePresentation.setText(s.name ?: "Claude", false)
+        templatePresentation.description = s.workDir
+        templatePresentation.putClientProperty(ActionUtil.SECONDARY_TEXT, describe(s))
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        ClaudeGridToolWindowFactory.show(project)
+        ClaudeSessionManager.getInstance(project).reopen(id)
+    }
+
+    companion object {
+        /** "idle-game · 5 minutes ago" */
+        fun describe(s: SessionState): String {
+            val folder = s.workDir?.let { java.io.File(it).name }.orEmpty()
+            val time = if (s.closedAt > 0) DateFormatUtil.formatPrettyDateTime(s.closedAt) else ""
+            return listOf(folder, time).filter { it.isNotEmpty() }.joinToString(" · ")
+        }
+    }
+}
+
+/** Used by the empty grid's recent-session list. */
+fun describeClosedSession(s: SessionState): String = ResumeClosedAction.describe(s)

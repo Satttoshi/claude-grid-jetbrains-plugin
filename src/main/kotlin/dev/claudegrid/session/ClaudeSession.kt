@@ -13,6 +13,8 @@ class ClaudeSession(
     name: String,
     val workDir: String,
     val terminal: EmbeddedTerminal,
+    /** See [dev.claudegrid.state.SessionState.pickOnResume]. */
+    val pickOnResume: Boolean = false,
 ) : Disposable {
     var name: String = name
         internal set

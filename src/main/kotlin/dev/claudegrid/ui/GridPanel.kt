@@ -1,5 +1,6 @@
 package dev.claudegrid.ui
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -10,6 +11,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import dev.claudegrid.actions.NewSessionAction
+import dev.claudegrid.actions.describeClosedSession
 import dev.claudegrid.session.ClaudeGridListener
 import dev.claudegrid.session.ClaudeSession
 import dev.claudegrid.session.ClaudeSessionManager
@@ -111,16 +113,38 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         return splitter
     }
 
+    /** Shown when no session is open: start a new one, or resume one of the recently closed ones. */
     private fun emptyState(): JComponent {
         val box = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
-            add(JBLabel("No Claude sessions yet").apply { foreground = UIUtil.getContextHelpForeground(); alignmentX = CENTER_ALIGNMENT })
-            add(ActionLink("New Claude Session") { NewSessionAction.createSession(project) }.apply {
-                alignmentX = CENTER_ALIGNMENT
-                border = JBUI.Borders.emptyTop(8)
-            })
         }
+        fun add(c: JComponent, top: Int = 0) {
+            c.alignmentX = LEFT_ALIGNMENT
+            if (top > 0) c.border = JBUI.Borders.emptyTop(top)
+            box.add(c)
+        }
+        add(ActionLink("New Claude session") { NewSessionAction.createSession(project) }.apply { setIcon(AllIcons.General.Add) })
+
+        val recent = manager.closedSessions.take(MAX_RECENT_IN_EMPTY_STATE)
+        if (recent.isNotEmpty()) {
+            add(JBLabel("Recently closed").apply { foreground = UIUtil.getContextHelpForeground() }, top = 16)
+            for (s in recent) {
+                val id = s.id ?: continue
+                val row = JPanel(BorderLayout(JBUI.scale(8), 0)).apply {
+                    isOpaque = false
+                    add(ActionLink(s.name ?: "Claude") { manager.reopen(id) }.apply {
+                        setIcon(AllIcons.Vcs.History)
+                        toolTipText = "Resume this conversation"
+                    }, BorderLayout.WEST)
+                    add(JBLabel(describeClosedSession(s)).apply { foreground = UIUtil.getContextHelpForeground() }, BorderLayout.CENTER)
+                }
+                add(row, top = 6)
+            }
+        }
+        add(ActionLink("Resume with Claude's picker…") { manager.createSession(pickFromClaude = true) }.apply {
+            setIcon(AllIcons.Actions.Search)
+        }, top = 16)
         return JPanel(GridBagLayout()).apply { add(box) }
     }
 
@@ -141,6 +165,8 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     }
 
     companion object {
+        private const val MAX_RECENT_IN_EMPTY_STATE = 5
+
         fun create(project: Project, parent: Disposable): GridPanel = GridPanel(project).also { Disposer.register(parent, it) }
     }
 }

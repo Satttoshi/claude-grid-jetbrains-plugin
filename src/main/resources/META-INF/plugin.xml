@@ -51,6 +51,22 @@
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift OPEN_BRACKET"/>
         </action>
 
+        <action id="ClaudeGrid.ReopenClosed" class="dev.claudegrid.actions.ReopenClosedSessionAction"
+                text="Reopen Closed Claude Session" description="Resume the most recently closed Claude session"
+                icon="AllIcons.Vcs.History">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift T"/>
+        </action>
+        <action id="ClaudeGrid.ResumeWithPicker" class="dev.claudegrid.actions.ResumeWithClaudePickerAction"
+                text="Resume with Claude's Picker…"
+                description="Open a pane running 'claude --resume' to pick any conversation"
+                icon="AllIcons.Actions.Search"/>
+        <action id="ClaudeGrid.ClearRecentlyClosed" class="dev.claudegrid.actions.ClearRecentlyClosedAction"
+                text="Clear Recently Closed"
+                description="Forget the recently closed list (Claude's conversations are kept)"/>
+        <group id="ClaudeGrid.ResumeMenu" class="dev.claudegrid.actions.ResumeSessionGroup" popup="true"
+               text="Resume Session" description="Resume a recently closed Claude session"
+               icon="AllIcons.Vcs.History"/>
+
         <group id="ClaudeGrid.Layout" text="Layout" popup="true" icon="AllIcons.Actions.Layout">
             <action id="ClaudeGrid.Layout.Columns" class="dev.claudegrid.actions.LayoutColumnsAction"
                     text="Columns" icon="AllIcons.Actions.SplitVertically"/>
@@ -62,6 +78,7 @@
 
         <group id="ClaudeGrid.Toolbar">
             <reference ref="ClaudeGrid.NewSession"/>
+            <reference ref="ClaudeGrid.ResumeMenu"/>
             <reference ref="ClaudeGrid.CloseSession"/>
             <separator/>
             <reference ref="ClaudeGrid.Layout.Columns"/>

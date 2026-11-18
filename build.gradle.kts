@@ -12,6 +12,11 @@ version = providers.gradleProperty("pluginVersion").get()
 // The 2026.2 platform is compiled to Java 25 bytecode (class file major 69).
 kotlin {
     jvmToolchain(25)
+    compilerOptions {
+        // Don't generate bridges for interface default methods; they show up as deprecated-API usages
+        // (e.g. ToolWindowFactory.isApplicable) in verifyPlugin.
+        jvmDefault.set(org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode.NO_COMPATIBILITY)
+    }
 }
 
 repositories {

@@ -1,5 +1,8 @@
 package dev.claudegrid.session
 
+import com.intellij.notification.NotificationAction
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -76,7 +79,8 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         restored = true
         for (s in state.sessions.toList()) {
             val id = s.id ?: continue
-            val session = start(id, s.name ?: nextDefaultName(), s.workDir ?: project.basePath ?: continue, resume = true)
+            val session = start(id, s.name ?: nextDefaultName(), s.workDir ?: project.basePath ?: continue,
+                if (s.pickOnResume) StartMode.PICKER else StartMode.RESUME)
             session.autoName = s.autoName
         }
         if (_sessions.isNotEmpty()) publisher.structureChanged()
@@ -88,29 +92,68 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         return "CLAUDE ${generateSequence(1) { it + 1 }.first { it !in used }}"
     }
 
+    /** @param pickFromClaude run `claude --resume` without an id, i.e. let the user pick a conversation in Claude's own picker. */
     fun createSession(
         name: String = nextDefaultName(),
         workDir: String = project.basePath ?: System.getProperty("user.home"),
+        pickFromClaude: Boolean = false,
     ): ClaudeSession {
         restoreIfNeeded()
-        val session = start(UUID.randomUUID().toString(), name, workDir, resume = false)
+        val session = start(UUID.randomUUID().toString(), name, workDir, if (pickFromClaude) StartMode.PICKER else StartMode.NEW)
+        showStarted(session)
+        return session
+    }
+
+    /** Recently closed sessions, most recent first. */
+    val closedSessions: List<SessionState> get() = state.closed
+
+    /** Reopens a recently closed session at its old grid position and resumes its conversation. */
+    fun reopen(id: String): ClaudeSession? {
+        restoreIfNeeded()
+        _sessions.find { it.id == id }?.let { publisher.focusRequested(it); return it }
+        val closed = state.closed.find { it.id == id } ?: return null
+        state.closed = state.closed.filterTo(mutableListOf()) { it.id != id }
+        val session = start(
+            id, closed.name ?: nextDefaultName(), closed.workDir ?: project.basePath ?: return null,
+            if (closed.pickOnResume) StartMode.PICKER else StartMode.RESUME,
+            index = closed.position.takeIf { it >= 0 } ?: _sessions.size,
+        )
+        session.autoName = closed.autoName
+        showStarted(session)
+        return session
+    }
+
+    fun reopenLast(): ClaudeSession? = state.closed.firstOrNull()?.id?.let(::reopen)
+
+    /** Forgets the list only; Claude's own conversation files are never touched. */
+    fun clearClosed() {
+        state.closed = mutableListOf()
+        publisher.structureChanged()
+    }
+
+    private fun showStarted(session: ClaudeSession) {
         maximizedId = null
         focusedId = session.id
         persistSessions()
         publisher.structureChanged()
         publisher.focusRequested(session)
-        return session
     }
 
-    private fun start(id: String, name: String, workDir: String, resume: Boolean): ClaudeSession {
+    private enum class StartMode { NEW, RESUME, PICKER }
+
+    private fun start(id: String, name: String, workDir: String, mode: StartMode, index: Int = _sessions.size): ClaudeSession {
         val terminal = TerminalCompat.create(project, workDir, name, mapOf("CLAUDE_GRID_SESSION" to id))
-        val session = ClaudeSession(id, name, workDir, terminal)
+        val session = ClaudeSession(id, name, workDir, terminal, pickOnResume = mode == StartMode.PICKER)
         Disposer.register(this, session)
-        _sessions += session
+        _sessions.add(index.coerceIn(0, _sessions.size), session)
         val cmd = state.claudeCommand?.takeIf { it.isNotBlank() } ?: "claude"
-        // --resume fails if the conversation was never written (no prompt sent yet); then start fresh with the same id.
         terminal.executeCommand(
-            if (resume) "$cmd --resume $id || $cmd --session-id $id" else "$cmd --session-id $id"
+            when (mode) {
+                StartMode.NEW -> "$cmd --session-id $id"
+                // --resume fails if the conversation was never written (no prompt sent yet); then start fresh with the same id.
+                StartMode.RESUME -> "$cmd --resume $id || $cmd --session-id $id"
+                StartMode.PICKER -> "$cmd --resume"
+            }
         )
         terminal.onApplicationTitleChanged { title ->
             val topic = conversationTitle(title) ?: return@onApplicationTitleChanged
@@ -123,14 +166,35 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         return session
     }
 
+    /** Terminates the session and parks it in "Recently closed" so it can be resumed later. */
     fun close(session: ClaudeSession) {
-        if (!_sessions.remove(session)) return
+        val position = _sessions.indexOf(session)
+        if (position < 0) return
+        _sessions.removeAt(position)
         if (maximizedId == session.id) maximizedId = null
         if (focusedId == session.id) focusedId = _sessions.firstOrNull()?.id
         persistSessions()
+        park(session, position)
         Disposer.dispose(session)
         publisher.structureChanged()
         focusedSession?.let { publisher.focusRequested(it) }
+        notifyClosed(session)
+    }
+
+    private fun park(session: ClaudeSession, position: Int) {
+        val entry = session.toState().apply {
+            closedAt = System.currentTimeMillis()
+            this.position = position
+        }
+        state.closed = (listOf(entry) + state.closed.filter { it.id != session.id })
+            .take(ClaudeGridState.MAX_CLOSED).toMutableList()
+    }
+
+    private fun notifyClosed(session: ClaudeSession) {
+        NotificationGroupManager.getInstance().getNotificationGroup("Claude Grid")
+            .createNotification("Closed \"${session.name}\"", NotificationType.INFORMATION)
+            .addAction(NotificationAction.createSimpleExpiring("Reopen") { reopen(session.id) })
+            .notify(project)
     }
 
     /** A user-chosen name pins the session's name; a blank one switches back to Claude's conversation title. */
@@ -176,9 +240,15 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     }
 
     private fun persistSessions() {
-        state.sessions = _sessions.mapTo(mutableListOf()) {
-            SessionState().apply { id = it.id; name = it.name; workDir = it.workDir; autoName = it.autoName }
-        }
+        state.sessions = _sessions.mapTo(mutableListOf()) { it.toState() }
+    }
+
+    private fun ClaudeSession.toState() = SessionState().also {
+        it.id = id
+        it.name = name
+        it.workDir = workDir
+        it.autoName = autoName
+        it.pickOnResume = pickOnResume
     }
 
     override fun dispose() {

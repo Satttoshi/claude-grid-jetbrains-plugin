@@ -17,10 +17,17 @@ class SessionState : BaseState() {
     var workDir by string()
     /** True until the user renames the session; then Claude's title no longer overrides the name. */
     var autoName by property(true)
+    /** Started via Claude's own `--resume` picker: the conversation id is unknown, so resuming shows the picker again. */
+    var pickOnResume by property(false)
+    /** Only for recently closed sessions: when it was closed and at which grid position (to reopen it there). */
+    var closedAt by property(0L)
+    var position by property(-1)
 }
 
 class GridState : BaseState() {
     var sessions by list<SessionState>()
+    /** Most recent first, capped at [ClaudeGridState.MAX_CLOSED]. */
+    var closed by list<SessionState>()
     var layout by enum(LayoutMode.GRID)
     /** Splitter proportions, keyed by "<layout>:<session count>:<splitter path>". */
     var proportions by map<String, Float>()
@@ -32,6 +39,8 @@ class GridState : BaseState() {
 @State(name = "ClaudeGrid", storages = [Storage(StoragePathMacros.WORKSPACE_FILE)])
 class ClaudeGridState : SimplePersistentStateComponent<GridState>(GridState()) {
     companion object {
+        const val MAX_CLOSED = 20
+
         fun getInstance(project: Project): ClaudeGridState = project.service()
     }
 }

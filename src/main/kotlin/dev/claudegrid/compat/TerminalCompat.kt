@@ -82,5 +82,6 @@ class ClaudeGridTerminalAllowedActions : TerminalAllowedActionsProvider {
         "ClaudeGrid.FocusNext",
         "ClaudeGrid.FocusPrevious",
         "ClaudeGrid.OpenGrid",
+        "ClaudeGrid.ReopenClosed",
     )
 }
