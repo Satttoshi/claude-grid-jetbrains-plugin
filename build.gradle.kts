@@ -47,6 +47,23 @@ intellijPlatform {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
             untilBuild = provider { null }
         }
+        changeNotes = """
+            <h3>0.1.0</h3>
+            <ul>
+              <li>First release: Claude Code sessions tiled in columns, rows or a grid in a sidebar tool window.</li>
+              <li>Automatic pane names from Claude's conversation title.</li>
+              <li>Restore and resume sessions after an IDE restart; reopen recently closed sessions.</li>
+            </ul>
+        """.trimIndent()
+    }
+    // Secrets come from environment variables (locally or GitHub Actions secrets), never from the repo.
+    signing {
+        certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
+        privateKey = providers.environmentVariable("PRIVATE_KEY")
+        password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
+    publishing {
+        token = providers.environmentVariable("PUBLISH_TOKEN")
     }
     pluginVerification {
         ides {

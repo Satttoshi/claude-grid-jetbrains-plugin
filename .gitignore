@@ -3,7 +3,9 @@
 build/
 .intellijPlatform/
 out/
-.idea/workspace.xml
-.idea/shelf/
-.idea/claude-grid/
+.idea/
+*.iml
 .DS_Store
+# Signing material must never be committed
+*.pem
+*.crt

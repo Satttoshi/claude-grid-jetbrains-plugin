@@ -22,7 +22,8 @@ Working rule: after every change run `./gradlew buildPlugin`, then ask the user 
 
 - Target: IntelliJ IDEA 2026.2.3 (build 262), `since-build` 262, no `until-build`.
 - The 2026.2 platform is Java 25 bytecode, so the Kotlin toolchain is JDK 25 (auto-provisioned via foojay).
-- `gradle.properties` sets `platformLocalPath` to a locally installed IDE (machine specific). On other machines remove it or override with `-PplatformLocalPath=`; the build then downloads `platformVersion`. `verifyPlugin` uses the same switch (local IDE vs. `recommended()`).
+- `platformLocalPath` (optional, machine specific, so it lives in `~/.gradle/gradle.properties`, never in the repo) points at a locally installed IDE; without it the build downloads `platformVersion`. `verifyPlugin` uses the same switch (local IDE vs. `recommended()`).
+- Marketplace plugin ID is `io.github.satttoshi.claudegrid` (permanent), display name "Grid for Claude Code". Kotlin packages stay `dev.claudegrid`. Signing and publishing read secrets from env vars; `.github/workflows/release.yml` publishes on a GitHub release.
 - Kotlin stdlib is provided by the IDE (`kotlin.stdlib.default.dependency=false`).
 
 ## Architecture

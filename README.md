@@ -1,4 +1,4 @@
-# Claude Grid
+# Grid for Claude Code
 
 A JetBrains IDE plugin that shows several [Claude Code](https://docs.claude.com/en/docs/claude-code) terminal sessions side by side, tiled in columns, rows, or a grid, in a "Claude Grid" sidebar tool window.
 
@@ -18,10 +18,14 @@ A JetBrains IDE plugin that shows several [Claude Code](https://docs.claude.com/
 
 ## Install
 
+From the JetBrains Marketplace: Settings → Plugins → Marketplace → search "Grid for Claude Code".
+
+From a zip (a GitHub release, or your own build):
+
 1. `./gradlew buildPlugin`
 2. In the IDE: Settings → Plugins → ⚙ → Install Plugin from Disk → `build/distributions/claude-grid-*.zip`
 
-`gradle.properties` points `platformLocalPath` at a locally installed IDE. Remove it (or pass `-PplatformLocalPath=`) to build against the downloaded `platformVersion` instead.
+By default the build downloads IntelliJ IDEA `platformVersion`. To build against a locally installed IDE instead, set `platformLocalPath=/path/to/IDE.app` in `~/.gradle/gradle.properties`.
 
 ## Usage
 
@@ -42,6 +46,14 @@ Open the grid via Tools → Open Claude Grid or the "Claude Grid" tool window on
 ./gradlew verifyPlugin   # compatibility check
 ```
 
+## Releasing
+
+1. Bump `pluginVersion` in `gradle.properties` and add change notes in `build.gradle.kts`.
+2. Commit, push, and publish a GitHub release (tag `vX.Y.Z`).
+3. The `Release` workflow signs the plugin, uploads it to the Marketplace, and attaches the signed zip to the release. It needs the repository secrets `CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD`, and `PUBLISH_TOKEN`.
+
 ## License
 
 [MIT](LICENSE)
+
+Community plugin, not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.

@@ -1,10 +1,20 @@
 <idea-plugin>
-    <id>dev.claudegrid</id>
-    <name>Claude Grid</name>
-    <vendor>claude-grid</vendor>
+    <id>io.github.satttoshi.claudegrid</id>
+    <name>Grid for Claude Code</name>
+    <vendor url="https://github.com/Satttoshi/claude-grid-jetbrains-plugin">Joshua Stolle</vendor>
     <description><![CDATA[
-        Shows several Claude Code terminal sessions side by side, tiled in columns, rows or a grid,
-        in a sidebar tool window. Sessions are restored (and their conversations resumed) after an IDE restart.
+        <p>Run several <a href="https://docs.claude.com/en/docs/claude-code">Claude Code</a> sessions side by side
+        in a <b>Claude Grid</b> sidebar tool window, using the IDE's own terminal.</p>
+        <ul>
+          <li>Automatic tiling: one session fills the view, two or three sit in columns, four or more form a grid.
+              Switch between Columns, Rows and Grid without restarting sessions.</li>
+          <li>Resizable panes, maximize/restore a pane, keyboard shortcuts to move between panes.</li>
+          <li>Panes are named after Claude's conversation title; double-click a name to rename it.</li>
+          <li>Sessions, layout and pane sizes are restored after an IDE restart, and every pane resumes its own conversation.</li>
+          <li>Reopen recently closed sessions, or resume any conversation through Claude's picker.</li>
+        </ul>
+        <p>Requires the <code>claude</code> CLI on your <code>PATH</code>.</p>
+        <p><i>Community plugin, not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.</i></p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
