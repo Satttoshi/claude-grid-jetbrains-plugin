@@ -1,0 +1,74 @@
+<idea-plugin>
+    <id>dev.claudegrid</id>
+    <name>Claude Grid</name>
+    <vendor>claude-grid</vendor>
+    <description><![CDATA[
+        Shows several Claude Code terminal sessions side by side, tiled in columns, rows or a grid,
+        in an editor tab. Sessions are restored (and their conversations resumed) after an IDE restart.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileEditorProvider implementation="dev.claudegrid.ui.ClaudeGridEditorProvider"/>
+        <notificationGroup id="Claude Grid" displayType="BALLOON"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
+        <allowedActionsProvider implementation="dev.claudegrid.compat.ClaudeGridTerminalAllowedActions"/>
+    </extensions>
+
+    <actions>
+        <action id="ClaudeGrid.OpenGrid" class="dev.claudegrid.actions.OpenGridAction"
+                text="Open Claude Grid" description="Show all Claude Code sessions side by side"
+                icon="AllIcons.Actions.SplitVertically">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift C"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
+        <action id="ClaudeGrid.NewSession" class="dev.claudegrid.actions.NewSessionAction"
+                text="New Claude Session" description="Start a shell in the project root and run claude"
+                icon="AllIcons.General.Add">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift N"/>
+        </action>
+        <action id="ClaudeGrid.CloseSession" class="dev.claudegrid.actions.CloseSessionAction"
+                text="Close Claude Session" description="Terminate the focused Claude session"
+                icon="AllIcons.Actions.Cancel"/>
+        <action id="ClaudeGrid.ToggleMaximize" class="dev.claudegrid.actions.ToggleMaximizeAction"
+                text="Maximize / Restore Pane" description="Toggle the focused pane to fill the grid"
+                icon="AllIcons.General.ExpandComponent">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift M"/>
+        </action>
+        <action id="ClaudeGrid.FocusNext" class="dev.claudegrid.actions.FocusNextAction"
+                text="Focus Next Claude Pane" icon="AllIcons.Actions.Forward">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift CLOSE_BRACKET"/>
+        </action>
+        <action id="ClaudeGrid.FocusPrevious" class="dev.claudegrid.actions.FocusPreviousAction"
+                text="Focus Previous Claude Pane" icon="AllIcons.Actions.Back">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift OPEN_BRACKET"/>
+        </action>
+
+        <group id="ClaudeGrid.Layout" text="Layout" popup="true" icon="AllIcons.Actions.Layout">
+            <action id="ClaudeGrid.Layout.Columns" class="dev.claudegrid.actions.LayoutColumnsAction"
+                    text="Columns" icon="AllIcons.Actions.SplitVertically"/>
+            <action id="ClaudeGrid.Layout.Rows" class="dev.claudegrid.actions.LayoutRowsAction"
+                    text="Rows" icon="AllIcons.Actions.SplitHorizontally"/>
+            <action id="ClaudeGrid.Layout.Grid" class="dev.claudegrid.actions.LayoutGridAction"
+                    text="Grid" icon="AllIcons.Actions.GroupByModule"/>
+        </group>
+
+        <group id="ClaudeGrid.Toolbar">
+            <reference ref="ClaudeGrid.NewSession"/>
+            <reference ref="ClaudeGrid.CloseSession"/>
+            <separator/>
+            <reference ref="ClaudeGrid.Layout.Columns"/>
+            <reference ref="ClaudeGrid.Layout.Rows"/>
+            <reference ref="ClaudeGrid.Layout.Grid"/>
+            <separator/>
+            <reference ref="ClaudeGrid.ToggleMaximize"/>
+            <reference ref="ClaudeGrid.FocusPrevious"/>
+            <reference ref="ClaudeGrid.FocusNext"/>
+        </group>
+    </actions>
+</idea-plugin>

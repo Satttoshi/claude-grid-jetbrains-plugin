@@ -1,0 +1,9 @@
+.gradle/
+.kotlin/
+build/
+.intellijPlatform/
+out/
+.idea/workspace.xml
+.idea/shelf/
+.idea/claude-grid/
+.DS_Store
