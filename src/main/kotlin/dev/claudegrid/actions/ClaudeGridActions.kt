@@ -5,7 +5,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbAwareToggleAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages
 import dev.claudegrid.session.ClaudeSessionManager
 import dev.claudegrid.state.LayoutMode
 import dev.claudegrid.ui.ClaudeGridToolWindowFactory
@@ -31,17 +30,13 @@ class OpenGridAction : ClaudeGridAction() {
 class NewSessionAction : ClaudeGridAction() {
     override fun isEnabled(manager: ClaudeSessionManager) = true
     override fun actionPerformed(e: AnActionEvent) {
-        createInteractively(e.project ?: return)
+        createSession(e.project ?: return)
     }
 
     companion object {
-        fun createInteractively(project: Project) {
-            val manager = ClaudeSessionManager.getInstance(project)
-            manager.restoreIfNeeded()
-            val default = "Claude ${manager.sessions.size + 1}"
-            val name = Messages.showInputDialog(project, "Session name:", "New Claude Session", null, default, null) ?: return
+        fun createSession(project: Project) {
             ClaudeGridToolWindowFactory.show(project)
-            manager.createSession(name.trim().ifEmpty { default })
+            ClaudeSessionManager.getInstance(project).createSession()
         }
     }
 }

@@ -21,7 +21,7 @@ import javax.swing.JPanel
 class SessionPane(private val project: Project, val session: ClaudeSession) : JPanel(BorderLayout()) {
     private val manager get() = ClaudeSessionManager.getInstance(project)
     private val nameLabel = JBLabel(session.name).apply {
-        toolTipText = "Double-click to rename"
+        toolTipText = "Double-click to rename (empty name = follow Claude's conversation title)"
         border = JBUI.Borders.emptyLeft(6)
     }
     private val maximizeButton = InplaceButton(

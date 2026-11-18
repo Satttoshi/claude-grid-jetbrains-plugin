@@ -1,9 +1,12 @@
 package dev.claudegrid.compat
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.terminal.TerminalTitle
+import com.intellij.terminal.TerminalTitleListener
 import com.intellij.terminal.frontend.toolwindow.TerminalToolWindowTab
 import com.intellij.terminal.frontend.toolwindow.TerminalToolWindowTabsManager
 import com.intellij.terminal.frontend.view.TerminalAllowedActionsProvider
@@ -49,6 +52,19 @@ class EmbeddedTerminal internal constructor(private val tab: TerminalToolWindowT
             tab.view.sessionState.first { it == TerminalViewSessionState.Terminated }
             callback()
         }
+    }
+
+    /**
+     * Called on the EDT with the title the running program sets via OSC 0/2 (e.g. Claude Code's "✳ <topic>").
+     * Stops when this terminal is disposed.
+     */
+    fun onApplicationTitleChanged(callback: (String?) -> Unit) {
+        tab.view.title.addTitleListener(object : TerminalTitleListener {
+            override fun onTitleChanged(terminalTitle: TerminalTitle) {
+                val value = terminalTitle.applicationTitle
+                ApplicationManager.getApplication().invokeLater { callback(value) }
+            }
+        }, this)
     }
 
     override fun dispose() {

@@ -76,12 +76,22 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         restored = true
         for (s in state.sessions.toList()) {
             val id = s.id ?: continue
-            start(id, s.name ?: "Claude", s.workDir ?: project.basePath ?: continue, resume = true)
+            val session = start(id, s.name ?: nextDefaultName(), s.workDir ?: project.basePath ?: continue, resume = true)
+            session.autoName = s.autoName
         }
         if (_sessions.isNotEmpty()) publisher.structureChanged()
     }
 
-    fun createSession(name: String, workDir: String = project.basePath ?: System.getProperty("user.home")): ClaudeSession {
+    /** "CLAUDE <n>" with the lowest n not used by another session. */
+    fun nextDefaultName(): String {
+        val used = _sessions.mapNotNull { DEFAULT_NAME.matchEntire(it.name)?.groupValues?.get(1)?.toIntOrNull() }.toSet()
+        return "CLAUDE ${generateSequence(1) { it + 1 }.first { it !in used }}"
+    }
+
+    fun createSession(
+        name: String = nextDefaultName(),
+        workDir: String = project.basePath ?: System.getProperty("user.home"),
+    ): ClaudeSession {
         restoreIfNeeded()
         val session = start(UUID.randomUUID().toString(), name, workDir, resume = false)
         maximizedId = null
@@ -102,6 +112,10 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         terminal.executeCommand(
             if (resume) "$cmd --resume $id || $cmd --session-id $id" else "$cmd --session-id $id"
         )
+        terminal.onApplicationTitleChanged { title ->
+            val topic = conversationTitle(title) ?: return@onApplicationTitleChanged
+            if (session.autoName && session in _sessions) applyName(session, topic)
+        }
         terminal.onTerminated {
             // The shell exited (e.g. `exit`): drop the pane. Ignore terminations caused by the project closing.
             if (!projectClosing && !project.isDisposed && session in _sessions) close(session)
@@ -119,8 +133,19 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         focusedSession?.let { publisher.focusRequested(it) }
     }
 
+    /** A user-chosen name pins the session's name; a blank one switches back to Claude's conversation title. */
     fun rename(session: ClaudeSession, name: String) {
-        if (name.isBlank() || name == session.name) return
+        if (name.isBlank()) {
+            session.autoName = true
+            persistSessions()
+            return
+        }
+        session.autoName = false
+        applyName(session, name)
+    }
+
+    private fun applyName(session: ClaudeSession, name: String) {
+        if (name == session.name) return
         session.name = name
         persistSessions()
         publisher.sessionUpdated(session)
@@ -152,7 +177,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
 
     private fun persistSessions() {
         state.sessions = _sessions.mapTo(mutableListOf()) {
-            SessionState().apply { id = it.id; name = it.name; workDir = it.workDir }
+            SessionState().apply { id = it.id; name = it.name; workDir = it.workDir; autoName = it.autoName }
         }
     }
 
@@ -162,6 +187,18 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     }
 
     companion object {
+        private val DEFAULT_NAME = Regex("CLAUDE (\\d+)")
+        private val CLAUDE_TITLE = Regex("^[^\\p{L}\\p{N}\\s]\\s+(.+)$")
+
+        /**
+         * Claude Code sets the terminal title to "<status glyph> <conversation title>", e.g. "✳ Fix login bug"
+         * (the glyph animates while it works). Its generic start title is "✳ Claude Code". Shell titles have no glyph.
+         */
+        fun conversationTitle(terminalTitle: String?): String? {
+            val topic = CLAUDE_TITLE.matchEntire(terminalTitle?.trim() ?: return null)?.groupValues?.get(1)?.trim()
+            return topic?.takeIf { it.isNotEmpty() && it != "Claude Code" }
+        }
+
         fun getInstance(project: Project): ClaudeSessionManager = project.service()
     }
 }

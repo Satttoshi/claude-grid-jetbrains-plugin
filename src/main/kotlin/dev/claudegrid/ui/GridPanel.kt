@@ -116,7 +116,7 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             isOpaque = false
             add(JBLabel("No Claude sessions yet").apply { foreground = UIUtil.getContextHelpForeground(); alignmentX = CENTER_ALIGNMENT })
-            add(ActionLink("New Claude Session") { NewSessionAction.createInteractively(project) }.apply {
+            add(ActionLink("New Claude Session") { NewSessionAction.createSession(project) }.apply {
                 alignmentX = CENTER_ALIGNMENT
                 border = JBUI.Borders.emptyTop(8)
             })

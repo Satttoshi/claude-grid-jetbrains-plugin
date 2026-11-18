@@ -15,6 +15,8 @@ class SessionState : BaseState() {
     var id by string()
     var name by string()
     var workDir by string()
+    /** True until the user renames the session; then Claude's title no longer overrides the name. */
+    var autoName by property(true)
 }
 
 class GridState : BaseState() {

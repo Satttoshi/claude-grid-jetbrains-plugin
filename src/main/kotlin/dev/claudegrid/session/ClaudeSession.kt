@@ -17,6 +17,10 @@ class ClaudeSession(
     var name: String = name
         internal set
 
+    /** Follow the conversation title Claude Code reports, until the user picks a name. */
+    var autoName: Boolean = true
+        internal set
+
     init {
         Disposer.register(this, terminal)
     }
