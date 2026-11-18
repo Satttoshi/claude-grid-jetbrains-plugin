@@ -14,9 +14,14 @@ Claude Grid is an IntelliJ Platform plugin (Kotlin) that hosts several `claude` 
 ./gradlew verifyPlugin   # compatibility check against the target IDE
 ```
 
-There are no tests yet (the test framework `TestFrameworkType.Platform` is configured, so `./gradlew test` / `./gradlew test --tests '<FQN>'` will work once tests exist under `src/test/kotlin`).
+```bash
+./gradlew test                                   # all tests (src/test/kotlin)
+./gradlew test --tests 'dev.claudegrid.session.ClaudeTitleTest'
+```
 
-Working rule: after every change run `./gradlew buildPlugin`, then ask the user to test via `./gradlew runIde`.
+Tests: plain JUnit 4 for pure functions (`ClaudeTitleTest`), `BasePlatformTestCase` (`TestFrameworkType.Platform`) where the IDE is needed (`ConversationTrackerTest`). Tests never start a real terminal: `ClaudeSessionManager.terminalFactory` can be swapped for `FakeTerminal` (src/test), which records commands and fires title changes / termination.
+
+Working rule: after every change run `./gradlew buildPlugin test`, then ask the user to test via `./gradlew runIde`.
 
 ## Build environment
 
@@ -34,12 +39,12 @@ Package `dev.claudegrid`:
 - **`session/ClaudeSession`**: one session (UUID pane id, `conversationId`, name, workDir, `autoName`) owning its terminal; disposed via `Disposer`.
 - **`session/ConversationTracker`**: learns each pane's current conversation id from a `SessionStart` hook (see below).
 - **`ui/GridPanel`**: builds nested `JBSplitter`s from the session list and `LayoutMode`. A rebuild creates new splitters only and **re-parents existing `SessionPane`s**; never recreate or dispose a terminal widget to change layout, because that kills the running `claude` process. Maximize hides other panes without disposing them. Also tracks the focused pane via the AWT focus owner. Reordering: dragging a pane header onto another pane calls `ClaudeSessionManager.move` (plain mouse listeners on the header, no Swing DnD); the order of `sessions` is the grid order and is persisted.
-- **`ui/SessionPane`**: header (name, minimize, maximize, close; double-click to rename) plus the embedded terminal component.
+- **`ui/SessionPane`**: header (name, reload, minimize, maximize, close; double-click to rename, drag to reorder) plus the embedded terminal component.
 - **`ui/SessionDock`**: strip below the grid with a chip per minimized session (click restores, right-click for Restore/Rename/Close).
 - **`ui/ClaudeGridToolWindowFactory`**: the only grid host. Only one host may exist at a time since hosts re-parent the same terminal components (the earlier editor-tab host was removed, see commit 7f286aa).
 - **`state/ClaudeGridState`**: `SimplePersistentStateComponent` stored in the workspace file: open sessions, recently closed sessions (with grid position, capped at `MAX_CLOSED`), layout, splitter proportions keyed by `"<layout>:<count>:<path>"`, and the claude command. Restore happens lazily when the grid is first opened, not at IDE startup.
 - **`actions/ClaudeGridActions.kt`**: all actions, registered in `plugin.xml` (toolbar group `ClaudeGrid.Toolbar`).
-- **`compat/TerminalCompat.kt`**: the **only** place that touches the terminal plugin API. Keep all experimental/internal terminal API usage isolated here.
+- **`compat/TerminalCompat.kt`**: the **only** place that touches the terminal plugin API. Keep all experimental/internal terminal API usage isolated here. `EmbeddedTerminal` is an interface; `ReworkedTerminal` is the real implementation.
 
 ### Minimize vs. close
 
