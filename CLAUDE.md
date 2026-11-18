@@ -31,7 +31,8 @@ Working rule: after every change run `./gradlew buildPlugin`, then ask the user 
 Package `dev.claudegrid`:
 
 - **`session/ClaudeSessionManager`**: project service and owner of all sessions (create, close, rename, reopen, restore). It publishes changes on the project-level `ClaudeGridListener.TOPIC` (`structureChanged`, `sessionUpdated`, `focusRequested`); the UI only reacts to these events. Sessions outlive the grid UI and are terminated only when closed explicitly or when the project closes.
-- **`session/ClaudeSession`**: one session (UUID id, name, workDir, `autoName`) owning its terminal; disposed via `Disposer`.
+- **`session/ClaudeSession`**: one session (UUID pane id, `conversationId`, name, workDir, `autoName`) owning its terminal; disposed via `Disposer`.
+- **`session/ConversationTracker`**: learns each pane's current conversation id from a `SessionStart` hook (see below).
 - **`ui/GridPanel`**: builds nested `JBSplitter`s from the session list and `LayoutMode`. A rebuild creates new splitters only and **re-parents existing `SessionPane`s**; never recreate or dispose a terminal widget to change layout, because that kills the running `claude` process. Maximize hides other panes without disposing them. Also tracks the focused pane via the AWT focus owner. Reordering: dragging a pane header onto another pane calls `ClaudeSessionManager.move` (plain mouse listeners on the header, no Swing DnD); the order of `sessions` is the grid order and is persisted.
 - **`ui/SessionPane`**: header (name, minimize, maximize, close; double-click to rename) plus the embedded terminal component.
 - **`ui/SessionDock`**: strip below the grid with a chip per minimized session (click restores, right-click for Restore/Rename/Close).
@@ -53,7 +54,8 @@ Create a tab via `TerminalToolWindowTabsManager.createTabBuilder()...createTab()
 
 ### Session identity and naming
 
-- Each session gets a UUID passed as `claude --session-id <id>`; restore runs `claude --resume <id> || claude --session-id <id>` (not `--continue`, which would make all sessions in one directory resume the same conversation). The id is also exported as `CLAUDE_GRID_SESSION` (intended for planned hook-driven status dots per pane).
+- A pane has a stable UUID `id` (exported as `CLAUDE_GRID_SESSION`) and a `conversationId`. A new pane starts `claude --session-id <id>`, so both are equal at first; restore, reload and reopen run `claude --resume <conversationId> || claude --session-id <conversationId>` (not `--continue`, which would make all sessions in one directory resume the same conversation).
+- The conversation id changes when the user resumes another conversation inside a pane (`/resume`, Claude's picker) or runs `/clear`. To follow it, every launch passes `--settings <system dir>/claude-grid/hook-settings.json`, a `SessionStart` hook that writes Claude's hook input (with `session_id`) to `$CLAUDE_GRID_DIR/$CLAUDE_GRID_SESSION.json`. `ConversationTracker` reads it on terminal title changes, before close/reload and at project close. `--settings` only affects that launch; no settings file of the user is touched. A pane whose conversation is unknown (`conversationId == null`, started via the picker and not reported yet) resumes with a bare `claude --resume`.
 - New sessions are named `CLAUDE <n>` (lowest free n) and then follow Claude Code's terminal title (OSC 0, read via `TerminalView.title.applicationTitle` in `compat/`). A manual rename pins the name (`autoName = false`); renaming to empty switches back to automatic.
 
 ### Shortcuts inside the terminal

@@ -75,7 +75,10 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     init {
         project.messageBus.connect(this).subscribe(ProjectCloseListener.TOPIC, object : ProjectCloseListener {
             override fun projectClosing(project: Project) {
-                if (project == this@ClaudeSessionManager.project) projectClosing = true
+                if (project != this@ClaudeSessionManager.project) return
+                projectClosing = true
+                // Catch a conversation switch the title listener has not seen yet, before the state is saved.
+                _sessions.forEach(::syncConversation)
             }
         })
     }
@@ -88,11 +91,12 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             val id = s.id ?: continue
             val name = s.name ?: nextDefaultName()
             val workDir = s.workDir ?: project.basePath ?: continue
+            val conversationId = knownConversation(id, s)
             val session = if (s.minimized) {
                 // Dormant: started only when the user restores it from the dock.
-                add(ClaudeSession(id, name, workDir, pickOnResume = s.pickOnResume).also { it.minimized = true })
+                add(ClaudeSession(id, name, workDir, conversationId).also { it.minimized = true })
             } else {
-                start(id, name, workDir, if (s.pickOnResume) StartMode.PICKER else StartMode.RESUME)
+                start(id, name, workDir, conversationId, resume = true)
             }
             session.autoName = s.autoName
         }
@@ -112,7 +116,8 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         pickFromClaude: Boolean = false,
     ): ClaudeSession {
         restoreIfNeeded()
-        val session = start(UUID.randomUUID().toString(), name, workDir, if (pickFromClaude) StartMode.PICKER else StartMode.NEW)
+        val id = UUID.randomUUID().toString()
+        val session = start(id, name, workDir, conversationId = if (pickFromClaude) null else id, resume = pickFromClaude)
         showStarted(session)
         return session
     }
@@ -128,7 +133,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         state.closed = state.closed.filterTo(mutableListOf()) { it.id != id }
         val session = start(
             id, closed.name ?: nextDefaultName(), closed.workDir ?: project.basePath ?: return null,
-            if (closed.pickOnResume) StartMode.PICKER else StartMode.RESUME,
+            knownConversation(id, closed), resume = true,
             index = closed.position.takeIf { it >= 0 } ?: _sessions.size,
         )
         session.autoName = closed.autoName
@@ -140,6 +145,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
 
     /** Forgets the list only; Claude's own conversation files are never touched. */
     fun clearClosed() {
+        state.closed.forEach { s -> s.id?.let(ConversationTracker::forget) }
         state.closed = mutableListOf()
         publisher.structureChanged()
     }
@@ -152,11 +158,20 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         publisher.focusRequested(session)
     }
 
-    private enum class StartMode { NEW, RESUME, PICKER }
+    /**
+     * The conversation a persisted pane was last in: what its hook reported (the latest truth), else what was saved,
+     * else the pane id for state written before 0.3.1 (null if it was started via Claude's picker).
+     */
+    private fun knownConversation(id: String, s: SessionState): String? =
+        ConversationTracker.conversationId(id)
+            ?: s.conversationId?.takeIf(ConversationTracker::isValidId)
+            ?: id.takeIf { !s.pickOnResume && ConversationTracker.isValidId(it) }
 
-    private fun start(id: String, name: String, workDir: String, mode: StartMode, index: Int = _sessions.size): ClaudeSession {
-        val session = add(ClaudeSession(id, name, workDir, pickOnResume = mode == StartMode.PICKER), index)
-        launch(session, mode)
+    private fun start(
+        id: String, name: String, workDir: String, conversationId: String?, resume: Boolean, index: Int = _sessions.size,
+    ): ClaudeSession {
+        val session = add(ClaudeSession(id, name, workDir, conversationId), index)
+        launch(session, resume)
         return session
     }
 
@@ -166,22 +181,32 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         return session
     }
 
-    /** Starts the shell and `claude` for [session]. */
-    private fun launch(session: ClaudeSession, mode: StartMode) {
-        val id = session.id
-        val terminal = TerminalCompat.create(project, session.workDir, session.name, mapOf("CLAUDE_GRID_SESSION" to id))
+    /**
+     * Starts the shell and `claude` for [session]: resumes its conversation if [resume], else starts it new;
+     * shows Claude's picker if the conversation is unknown.
+     */
+    private fun launch(session: ClaudeSession, resume: Boolean) {
+        val env = mapOf(
+            ConversationTracker.PANE_ENV to session.id,
+            ConversationTracker.DIR_ENV to ConversationTracker.dir.toString(),
+        )
+        val terminal = TerminalCompat.create(project, session.workDir, session.name, env)
         session.attach(terminal)
-        val cmd = state.claudeCommand?.takeIf { it.isNotBlank() } ?: "claude"
+        val cmd = (state.claudeCommand?.takeIf { it.isNotBlank() } ?: "claude") +
+            " --settings " + shellQuote(ConversationTracker.settingsFile.toString())
+        val conversation = session.conversationId
         terminal.executeCommand(
-            when (mode) {
-                StartMode.NEW -> "$cmd --session-id $id"
+            when {
+                conversation == null -> "$cmd --resume"
                 // --resume fails if the conversation was never written (no prompt sent yet); then start fresh with the same id.
-                StartMode.RESUME -> "$cmd --resume $id || $cmd --session-id $id"
-                StartMode.PICKER -> "$cmd --resume"
+                resume -> "$cmd --resume $conversation || $cmd --session-id $conversation"
+                else -> "$cmd --session-id $conversation"
             }
         )
         terminal.onApplicationTitleChanged { title ->
             if (session !in _sessions) return@onApplicationTitleChanged
+            // Claude retitles the terminal on start, /resume and /clear: a good moment to look for a conversation switch.
+            syncConversation(session)
             updateActivity(session, titleGlyph(title))
             val topic = conversationTitle(title) ?: return@onApplicationTitleChanged
             if (session.autoName) applyName(session, topic)
@@ -190,6 +215,15 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             // The shell exited (e.g. `exit`): drop the pane. Ignore terminations caused by the project closing.
             if (!projectClosing && !project.isDisposed && session in _sessions) close(session)
         }
+    }
+
+    /** Adopts the conversation the pane's SessionStart hook reported, if it differs from the known one. */
+    private fun syncConversation(session: ClaudeSession) {
+        if (session.isDormant) return
+        val reported = ConversationTracker.conversationId(session.id) ?: return
+        if (reported == session.conversationId) return
+        session.conversationId = reported
+        persistSessions()
     }
 
     /** Tracks whether Claude is working; finishing while minimized flags the dock chip. */
@@ -223,7 +257,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         }
         session.minimized = false
         session.needsAttention = false
-        if (session.isDormant) launch(session, if (session.pickOnResume) StartMode.PICKER else StartMode.RESUME)
+        if (session.isDormant) launch(session, resume = true)
         showStarted(session)
     }
 
@@ -236,7 +270,8 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     fun reload(session: ClaudeSession): ClaudeSession? {
         val position = _sessions.indexOf(session)
         if (position < 0) return null
-        val fresh = ClaudeSession(session.id, session.name, session.workDir, pickOnResume = session.pickOnResume).also {
+        syncConversation(session)
+        val fresh = ClaudeSession(session.id, session.name, session.workDir, session.conversationId).also {
             it.autoName = session.autoName
             it.minimized = session.minimized
         }
@@ -244,7 +279,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         _sessions.removeAt(position)
         Disposer.dispose(session)
         add(fresh, position)
-        if (!fresh.minimized) launch(fresh, if (fresh.pickOnResume) StartMode.PICKER else StartMode.RESUME)
+        if (!fresh.minimized) launch(fresh, resume = true)
         persistSessions()
         publisher.structureChanged()
         if (!fresh.minimized) {
@@ -258,6 +293,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     fun close(session: ClaudeSession) {
         val position = _sessions.indexOf(session)
         if (position < 0) return
+        syncConversation(session)
         _sessions.removeAt(position)
         if (maximizedId == session.id) maximizedId = null
         if (focusedId == session.id) focusedId = visibleSessions.firstOrNull()?.id
@@ -274,8 +310,9 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             closedAt = System.currentTimeMillis()
             this.position = position
         }
-        state.closed = (listOf(entry) + state.closed.filter { it.id != session.id })
-            .take(ClaudeGridState.MAX_CLOSED).toMutableList()
+        val all = listOf(entry) + state.closed.filter { it.id != session.id }
+        all.drop(ClaudeGridState.MAX_CLOSED).forEach { s -> s.id?.let(ConversationTracker::forget) }
+        state.closed = all.take(ClaudeGridState.MAX_CLOSED).toMutableList()
     }
 
     private fun notifyClosed(session: ClaudeSession) {
@@ -364,7 +401,8 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         it.name = name
         it.workDir = workDir
         it.autoName = autoName
-        it.pickOnResume = pickOnResume
+        it.conversationId = conversationId
+        it.pickOnResume = conversationId == null
         it.minimized = minimized
     }
 
@@ -390,6 +428,9 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         /** The leading status glyph of Claude Code's title ("✳" when idle, a spinner frame while working), or null for a shell title. */
         fun titleGlyph(terminalTitle: String?): String? =
             CLAUDE_TITLE.matchEntire(terminalTitle?.trim() ?: return null)?.groupValues?.get(1)
+
+        /** Single-quotes [s] for POSIX shells (and fish). */
+        private fun shellQuote(s: String) = "'" + s.replace("'", "'\\''") + "'"
 
         fun getInstance(project: Project): ClaudeSessionManager = project.service()
     }

@@ -17,7 +17,15 @@ class SessionState : BaseState() {
     var workDir by string()
     /** True until the user renames the session; then Claude's title no longer overrides the name. */
     var autoName by property(true)
-    /** Started via Claude's own `--resume` picker: the conversation id is unknown, so resuming shows the picker again. */
+    /**
+     * The conversation the pane was last in, reported by Claude's SessionStart hook (see ConversationTracker).
+     * Differs from [id] after `/resume`, Claude's picker or `/clear`. Null in state written before 0.3.1.
+     */
+    var conversationId by string()
+    /**
+     * The conversation is unknown (Claude's picker was used and no hook reported the result yet), so resuming shows
+     * the picker again. Only read when [conversationId] is null; kept for state written before 0.3.1.
+     */
     var pickOnResume by property(false)
     /** Only for open sessions: shown in the dock instead of the grid; restored lazily (not started) after a restart. */
     var minimized by property(false)

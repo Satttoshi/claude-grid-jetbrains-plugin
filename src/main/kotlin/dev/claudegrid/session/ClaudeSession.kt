@@ -6,7 +6,9 @@ import dev.claudegrid.compat.EmbeddedTerminal
 
 /**
  * One Claude Code session: a shell in [workDir] running `claude`.
- * [id] is a UUID that doubles as Claude's `--session-id`, so the exact conversation can be resumed after a restart.
+ * [id] identifies the pane (stable for its whole life, exported as `CLAUDE_GRID_SESSION`). [conversationId] is the
+ * Claude conversation it shows; a new pane starts one with `--session-id <id>`, but it changes when the user resumes
+ * another conversation inside the pane or runs `/clear` (tracked via [ConversationTracker]).
  *
  * A session restored as minimized after an IDE restart is *dormant*: it has no [terminal] until it is first restored,
  * so no process runs for a conversation nobody is looking at.
@@ -15,9 +17,12 @@ class ClaudeSession(
     val id: String,
     name: String,
     val workDir: String,
-    /** See [dev.claudegrid.state.SessionState.pickOnResume]. */
-    val pickOnResume: Boolean = false,
+    conversationId: String?,
 ) : Disposable {
+    /** Null while unknown (started via Claude's picker and not reported yet): resuming then shows the picker again. */
+    var conversationId: String? = conversationId
+        internal set
+
     var name: String = name
         internal set
 
