@@ -8,6 +8,7 @@ A JetBrains IDE plugin that shows several [Claude Code](https://docs.claude.com/
 - Resizable panes, maximize/restore of a single pane, focus next/previous pane.
 - Sessions are named after Claude's conversation title automatically; double-click a pane's name to rename it.
 - Per-project persistence: sessions, layout, and splitter proportions are restored after an IDE restart, and each pane resumes its own Claude conversation.
+- Minimize sessions to a dock below the grid: they keep running and come back instantly (no resume). A chip shows a spinner while Claude works and a dot once it finished.
 - Reopen recently closed sessions, or resume any conversation through Claude's own picker.
 
 ## Requirements
@@ -36,6 +37,7 @@ Open the grid via Tools → Open Claude Grid or the "Claude Grid" tool window on
 | Open Claude Grid | `Ctrl+Alt+Shift+C` |
 | New Claude Session | `Ctrl+Alt+Shift+N` |
 | Maximize / Restore Pane | `Ctrl+Alt+Shift+M` |
+| Minimize Session | `Ctrl+Alt+Shift+H` |
 | Focus Next / Previous Pane | `Ctrl+Alt+Shift+]` / `Ctrl+Alt+Shift+[` |
 | Reopen Closed Session | `Ctrl+Alt+Shift+T` |
 

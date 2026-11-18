@@ -17,7 +17,7 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JPanel
 
-/** Header (name, maximize, close) + the session's embedded terminal. Created once per session and re-parented on layout changes. */
+/** Header (name, minimize, maximize, close) + the session's embedded terminal. Created once per session and re-parented on layout changes. */
 class SessionPane(private val project: Project, val session: ClaudeSession) : JPanel(BorderLayout()) {
     private val manager get() = ClaudeSessionManager.getInstance(project)
     private val nameLabel = JBLabel(session.name).apply {
@@ -49,6 +49,9 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
     init {
         val buttons = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0)).apply {
             isOpaque = false
+            add(InplaceButton(IconButton("Minimize (keeps running)", AllIcons.General.HideToolWindow)) {
+                manager.minimize(session)
+            })
             add(maximizeButton)
             add(InplaceButton(IconButton("Close Session", AllIcons.Actions.Close, AllIcons.Actions.CloseHovered)) {
                 manager.close(session)
@@ -68,7 +71,7 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
         nameLabel.addMouseListener(headerMouse)
 
         add(header, BorderLayout.NORTH)
-        add(session.terminal.component, BorderLayout.CENTER)
+        add(session.requireTerminal.component, BorderLayout.CENTER)
         focusedPane = false
         updateBorder()
         nameLabel.foreground = UIUtil.getContextHelpForeground()
@@ -80,22 +83,26 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
 
     /** The terminal component may have been moved elsewhere (e.g. the pane was rebuilt); make sure it's ours. */
     fun ensureTerminalAttached() {
-        val c = session.terminal.component
+        val c = session.requireTerminal.component
         if (c.parent !== this) add(c, BorderLayout.CENTER)
     }
 
     fun focusTerminal() {
         manager.focusedId = session.id
-        session.terminal.preferredFocusableComponent.requestFocusInWindow()
+        session.requireTerminal.preferredFocusableComponent.requestFocusInWindow()
     }
 
-    private fun rename() {
-        val newName = Messages.showInputDialog(project, "Session name:", "Rename Claude Session", null, session.name, null)
-        if (newName != null) manager.rename(session, newName.trim())
-    }
+    private fun rename() = promptRename(project, session)
 
     private fun updateBorder() {
         val color = if (focusedPane) JBUI.CurrentTheme.Focus.focusColor() else JBColor.border()
         border = JBUI.Borders.customLine(color, if (focusedPane) 2 else 1)
+    }
+
+    companion object {
+        fun promptRename(project: Project, session: ClaudeSession) {
+            val newName = Messages.showInputDialog(project, "Session name:", "Rename Claude Session", null, session.name, null)
+            if (newName != null) ClaudeSessionManager.getInstance(project).rename(session, newName.trim())
+        }
     }
 }

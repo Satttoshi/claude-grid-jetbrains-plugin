@@ -11,6 +11,8 @@
           <li>Resizable panes, maximize/restore a pane, keyboard shortcuts to move between panes.</li>
           <li>Panes are named after Claude's conversation title; double-click a name to rename it.</li>
           <li>Sessions, layout and pane sizes are restored after an IDE restart, and every pane resumes its own conversation.</li>
+          <li>Minimize sessions to a dock below the grid: they keep running and come back instantly, with a
+              spinner while Claude works and a dot when it finished.</li>
           <li>Reopen recently closed sessions, or resume any conversation through Claude's picker.</li>
         </ul>
         <p>Requires the <code>claude</code> CLI on your <code>PATH</code>.</p>
@@ -47,6 +49,12 @@
         <action id="ClaudeGrid.CloseSession" class="dev.claudegrid.actions.CloseSessionAction"
                 text="Close Claude Session" description="Terminate the focused Claude session"
                 icon="AllIcons.Actions.Cancel"/>
+        <action id="ClaudeGrid.Minimize" class="dev.claudegrid.actions.MinimizeSessionAction"
+                text="Minimize Claude Session"
+                description="Hide the focused session in the dock; it keeps running and can be restored instantly"
+                icon="AllIcons.General.HideToolWindow">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift H"/>
+        </action>
         <action id="ClaudeGrid.ToggleMaximize" class="dev.claudegrid.actions.ToggleMaximizeAction"
                 text="Maximize / Restore Pane" description="Toggle the focused pane to fill the grid"
                 icon="AllIcons.General.ExpandComponent">
@@ -74,7 +82,7 @@
                 text="Clear Recently Closed"
                 description="Forget the recently closed list (Claude's conversations are kept)"/>
         <group id="ClaudeGrid.ResumeMenu" class="dev.claudegrid.actions.ResumeSessionGroup" popup="true"
-               text="Resume Session" description="Resume a recently closed Claude session"
+               text="Resume Session" description="Restore a minimized or resume a recently closed Claude session"
                icon="AllIcons.Vcs.History"/>
 
         <group id="ClaudeGrid.Layout" text="Layout" popup="true" icon="AllIcons.Actions.Layout">
@@ -95,6 +103,7 @@
             <reference ref="ClaudeGrid.Layout.Rows"/>
             <reference ref="ClaudeGrid.Layout.Grid"/>
             <separator/>
+            <reference ref="ClaudeGrid.Minimize"/>
             <reference ref="ClaudeGrid.ToggleMaximize"/>
             <reference ref="ClaudeGrid.FocusPrevious"/>
             <reference ref="ClaudeGrid.FocusNext"/>

@@ -13,6 +13,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbAwareToggleAction
 import com.intellij.openapi.project.Project
+import com.intellij.icons.AllIcons
+import dev.claudegrid.session.ClaudeSession
 import dev.claudegrid.session.ClaudeSessionManager
 import dev.claudegrid.state.LayoutMode
 import dev.claudegrid.ui.ClaudeGridToolWindowFactory
@@ -25,7 +27,7 @@ abstract class ClaudeGridAction : DumbAwareAction() {
         e.presentation.isEnabled = e.project != null && isEnabled(e.manager!!)
     }
 
-    open fun isEnabled(manager: ClaudeSessionManager): Boolean = manager.sessions.isNotEmpty()
+    open fun isEnabled(manager: ClaudeSessionManager): Boolean = manager.visibleSessions.isNotEmpty()
 }
 
 class OpenGridAction : ClaudeGridAction() {
@@ -60,6 +62,13 @@ class ToggleMaximizeAction : ClaudeGridAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val manager = e.manager ?: return
         manager.focusedSession?.let(manager::toggleMaximize)
+    }
+}
+
+class MinimizeSessionAction : ClaudeGridAction() {
+    override fun actionPerformed(e: AnActionEvent) {
+        val manager = e.manager ?: return
+        manager.focusedSession?.let(manager::minimize)
     }
 }
 
@@ -112,7 +121,7 @@ class ClearRecentlyClosedAction : ClaudeGridAction() {
     }
 }
 
-/** Dropdown next to "+": recently closed sessions, Claude's own picker, clear. */
+/** Dropdown next to "+": minimized sessions, recently closed sessions, Claude's own picker, clear. */
 class ResumeSessionGroup : ActionGroup(), DumbAware {
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
@@ -120,7 +129,12 @@ class ResumeSessionGroup : ActionGroup(), DumbAware {
         val manager = e?.manager ?: return AnAction.EMPTY_ARRAY
         val am = ActionManager.getInstance()
         val closed = manager.closedSessions.mapNotNull { s -> s.id?.let { ResumeClosedAction(it, s) } }
+        val minimized = manager.minimizedSessions.map { RestoreMinimizedAction(it) }
         return buildList {
+            if (minimized.isNotEmpty()) {
+                add(Separator.create("Minimized"))
+                addAll(minimized)
+            }
             if (closed.isEmpty()) {
                 add(Separator.create("No recently closed sessions"))
             } else {
@@ -131,6 +145,30 @@ class ResumeSessionGroup : ActionGroup(), DumbAware {
             add(am.getAction("ClaudeGrid.ResumeWithPicker"))
             add(am.getAction("ClaudeGrid.ClearRecentlyClosed"))
         }.toTypedArray()
+    }
+}
+
+private class RestoreMinimizedAction(private val session: ClaudeSession) : DumbAwareAction() {
+    init {
+        templatePresentation.setText(session.name, false)
+        templatePresentation.description = session.workDir
+        templatePresentation.icon = AllIcons.General.HideToolWindow
+        templatePresentation.putClientProperty(
+            ActionUtil.SECONDARY_TEXT,
+            when {
+                session.isDormant -> "not running"
+                session.busy -> "working"
+                session.needsAttention -> "finished"
+                else -> "running"
+            },
+        )
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        ClaudeGridToolWindowFactory.show(project)
+        ClaudeSessionManager.getInstance(project).restore(session)
     }
 }
 

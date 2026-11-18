@@ -34,6 +34,7 @@ import kotlin.math.sqrt
 class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
     private val manager = ClaudeSessionManager.getInstance(project)
     private val panes = mutableMapOf<String, SessionPane>()
+    private val dock = SessionDock(project)
 
     private val focusListener = PropertyChangeListener { evt ->
         val owner = evt.newValue as? java.awt.Component ?: return@PropertyChangeListener
@@ -49,11 +50,13 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             override fun structureChanged() = rebuild()
             override fun sessionUpdated(session: ClaudeSession) {
                 panes[session.id]?.refresh()
+                dock.refresh(session)
             }
             override fun focusRequested(session: ClaudeSession) {
                 updateFocusHighlight()
                 val pane = panes[session.id] ?: return
-                IdeFocusManager.getInstance(project).requestFocus(session.terminal.preferredFocusableComponent, true)
+                val terminal = session.terminal ?: return
+                IdeFocusManager.getInstance(project).requestFocus(terminal.preferredFocusableComponent, true)
                 pane.focusedPane = true
             }
         })
@@ -63,9 +66,9 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     }
 
     fun rebuild() {
-        val sessions = manager.sessions
-        // Forget panes of closed sessions; create panes for new ones.
-        panes.keys.retainAll(sessions.map { it.id }.toSet())
+        // Forget panes of closed sessions; keep those of minimized ones (their terminals keep running); create panes for new ones.
+        panes.keys.retainAll(manager.sessions.map { it.id }.toSet())
+        val sessions = manager.visibleSessions
         for (s in sessions) panes.getOrPut(s.id) { SessionPane(project, s) }
 
         removeAll()
@@ -79,6 +82,8 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             else -> buildLayout(ordered, manager.layout)
         }
         add(content, BorderLayout.CENTER)
+        dock.rebuild(manager.minimizedSessions)
+        add(dock, BorderLayout.SOUTH)
         updateFocusHighlight()
         revalidate()
         repaint()
@@ -124,6 +129,12 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
             if (top > 0) c.border = JBUI.Borders.emptyTop(top)
             box.add(c)
         }
+        if (manager.minimizedSessions.isNotEmpty()) {
+            add(JBLabel("All sessions are minimized; click one below to restore it.").apply {
+                foreground = UIUtil.getContextHelpForeground()
+                border = JBUI.Borders.emptyBottom(16)
+            })
+        }
         add(ActionLink("New Claude session") { NewSessionAction.createSession(project) }.apply { setIcon(AllIcons.General.Add) })
 
         val recent = manager.closedSessions.take(MAX_RECENT_IN_EMPTY_STATE)
@@ -150,16 +161,17 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
 
     private fun updateFocusHighlight() {
         val focused = manager.focusedId
-        panes.values.forEach { it.focusedPane = it.session.id == focused && panes.size > 1 }
+        val multiple = manager.visibleSessions.size > 1
+        panes.values.forEach { it.focusedPane = it.session.id == focused && multiple }
     }
 
     fun preferredFocusTarget(): JComponent? =
-        manager.focusedSession?.let { panes[it.id] }?.let { it.session.terminal.preferredFocusableComponent }
+        manager.focusedSession?.let { panes[it.id] }?.let { it.session.terminal?.preferredFocusableComponent }
 
     override fun dispose() {
         KeyboardFocusManager.getCurrentKeyboardFocusManager().removePropertyChangeListener("focusOwner", focusListener)
         // Detach terminals so the closed editor doesn't hold them; sessions stay alive in the manager.
-        panes.values.forEach { it.remove(it.session.terminal.component) }
+        panes.values.forEach { pane -> pane.session.terminal?.let { pane.remove(it.component) } }
         panes.clear()
         removeAll()
     }

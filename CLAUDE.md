@@ -33,11 +33,19 @@ Package `dev.claudegrid`:
 - **`session/ClaudeSessionManager`**: project service and owner of all sessions (create, close, rename, reopen, restore). It publishes changes on the project-level `ClaudeGridListener.TOPIC` (`structureChanged`, `sessionUpdated`, `focusRequested`); the UI only reacts to these events. Sessions outlive the grid UI and are terminated only when closed explicitly or when the project closes.
 - **`session/ClaudeSession`**: one session (UUID id, name, workDir, `autoName`) owning its terminal; disposed via `Disposer`.
 - **`ui/GridPanel`**: builds nested `JBSplitter`s from the session list and `LayoutMode`. A rebuild creates new splitters only and **re-parents existing `SessionPane`s**; never recreate or dispose a terminal widget to change layout, because that kills the running `claude` process. Maximize hides other panes without disposing them. Also tracks the focused pane via the AWT focus owner.
-- **`ui/SessionPane`**: header (name, close; double-click to rename) plus the embedded terminal component.
+- **`ui/SessionPane`**: header (name, minimize, maximize, close; double-click to rename) plus the embedded terminal component.
+- **`ui/SessionDock`**: strip below the grid with a chip per minimized session (click restores, right-click for Restore/Rename/Close).
 - **`ui/ClaudeGridToolWindowFactory`**: the only grid host. Only one host may exist at a time since hosts re-parent the same terminal components (the earlier editor-tab host was removed, see commit 7f286aa).
 - **`state/ClaudeGridState`**: `SimplePersistentStateComponent` stored in the workspace file: open sessions, recently closed sessions (with grid position, capped at `MAX_CLOSED`), layout, splitter proportions keyed by `"<layout>:<count>:<path>"`, and the claude command. Restore happens lazily when the grid is first opened, not at IDE startup.
 - **`actions/ClaudeGridActions.kt`**: all actions, registered in `plugin.xml` (toolbar group `ClaudeGrid.Toolbar`).
 - **`compat/TerminalCompat.kt`**: the **only** place that touches the terminal plugin API. Keep all experimental/internal terminal API usage isolated here.
+
+### Minimize vs. close
+
+- **Minimized**: the session stays in the manager's list with `minimized = true`; `GridPanel` tiles only `visibleSessions` and keeps the pane (and the running terminal) for when it is restored to its old slot. Focus Next/Previous skips minimized sessions.
+- After an IDE restart a minimized session is restored **dormant** (`ClaudeSession.terminal == null`) and only runs `claude --resume` when first restored. Visible sessions always have a terminal.
+- The dock chip reflects Claude's title glyph: a spinner while working (`busy`), a dot when Claude finished while minimized (`needsAttention`).
+- **Closed**: terminated and parked in "Recently closed" (resume via `--resume`).
 
 ### Terminal API (Reworked Terminal, `@ApiStatus.Experimental`)
 

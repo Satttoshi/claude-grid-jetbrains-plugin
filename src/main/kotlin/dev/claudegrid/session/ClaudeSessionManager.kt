@@ -20,7 +20,7 @@ interface ClaudeGridListener {
     /** Sessions were added/removed, or layout/maximize changed: the grid must rebuild its splitters. */
     fun structureChanged() {}
 
-    /** A session's name changed. */
+    /** A session's name, busy state or attention flag changed. */
     fun sessionUpdated(session: ClaudeSession) {}
 
     /** Move keyboard focus to this session's terminal. */
@@ -44,7 +44,14 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     private var restored = false
     private var projectClosing = false
 
+    /** All open sessions in grid order, including minimized ones. */
     val sessions: List<ClaudeSession> get() = _sessions
+
+    /** The sessions tiled in the grid. */
+    val visibleSessions: List<ClaudeSession> get() = _sessions.filter { !it.minimized }
+
+    /** The sessions shown as chips in the dock. */
+    val minimizedSessions: List<ClaudeSession> get() = _sessions.filter { it.minimized }
 
     var layout: LayoutMode
         get() = state.layout
@@ -58,10 +65,10 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     var maximizedId: String? = null
         private set
 
-    /** The session whose terminal last had focus (target of Close / Maximize). */
+    /** The session whose terminal last had focus (target of Close / Maximize / Minimize). */
     var focusedId: String? = null
 
-    val focusedSession: ClaudeSession? get() = _sessions.find { it.id == focusedId } ?: _sessions.firstOrNull()
+    val focusedSession: ClaudeSession? get() = visibleSessions.let { v -> v.find { it.id == focusedId } ?: v.firstOrNull() }
 
     private val publisher get() = project.messageBus.syncPublisher(ClaudeGridListener.TOPIC)
 
@@ -79,8 +86,14 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         restored = true
         for (s in state.sessions.toList()) {
             val id = s.id ?: continue
-            val session = start(id, s.name ?: nextDefaultName(), s.workDir ?: project.basePath ?: continue,
-                if (s.pickOnResume) StartMode.PICKER else StartMode.RESUME)
+            val name = s.name ?: nextDefaultName()
+            val workDir = s.workDir ?: project.basePath ?: continue
+            val session = if (s.minimized) {
+                // Dormant: started only when the user restores it from the dock.
+                add(ClaudeSession(id, name, workDir, pickOnResume = s.pickOnResume).also { it.minimized = true })
+            } else {
+                start(id, name, workDir, if (s.pickOnResume) StartMode.PICKER else StartMode.RESUME)
+            }
             session.autoName = s.autoName
         }
         if (_sessions.isNotEmpty()) publisher.structureChanged()
@@ -110,7 +123,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     /** Reopens a recently closed session at its old grid position and resumes its conversation. */
     fun reopen(id: String): ClaudeSession? {
         restoreIfNeeded()
-        _sessions.find { it.id == id }?.let { publisher.focusRequested(it); return it }
+        _sessions.find { it.id == id }?.let { restore(it); return it }
         val closed = state.closed.find { it.id == id } ?: return null
         state.closed = state.closed.filterTo(mutableListOf()) { it.id != id }
         val session = start(
@@ -142,10 +155,22 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     private enum class StartMode { NEW, RESUME, PICKER }
 
     private fun start(id: String, name: String, workDir: String, mode: StartMode, index: Int = _sessions.size): ClaudeSession {
-        val terminal = TerminalCompat.create(project, workDir, name, mapOf("CLAUDE_GRID_SESSION" to id))
-        val session = ClaudeSession(id, name, workDir, terminal, pickOnResume = mode == StartMode.PICKER)
+        val session = add(ClaudeSession(id, name, workDir, pickOnResume = mode == StartMode.PICKER), index)
+        launch(session, mode)
+        return session
+    }
+
+    private fun add(session: ClaudeSession, index: Int = _sessions.size): ClaudeSession {
         Disposer.register(this, session)
         _sessions.add(index.coerceIn(0, _sessions.size), session)
+        return session
+    }
+
+    /** Starts the shell and `claude` for [session]. */
+    private fun launch(session: ClaudeSession, mode: StartMode) {
+        val id = session.id
+        val terminal = TerminalCompat.create(project, session.workDir, session.name, mapOf("CLAUDE_GRID_SESSION" to id))
+        session.attach(terminal)
         val cmd = state.claudeCommand?.takeIf { it.isNotBlank() } ?: "claude"
         terminal.executeCommand(
             when (mode) {
@@ -156,14 +181,50 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             }
         )
         terminal.onApplicationTitleChanged { title ->
+            if (session !in _sessions) return@onApplicationTitleChanged
+            updateActivity(session, titleGlyph(title))
             val topic = conversationTitle(title) ?: return@onApplicationTitleChanged
-            if (session.autoName && session in _sessions) applyName(session, topic)
+            if (session.autoName) applyName(session, topic)
         }
         terminal.onTerminated {
             // The shell exited (e.g. `exit`): drop the pane. Ignore terminations caused by the project closing.
             if (!projectClosing && !project.isDisposed && session in _sessions) close(session)
         }
-        return session
+    }
+
+    /** Tracks whether Claude is working; finishing while minimized flags the dock chip. */
+    private fun updateActivity(session: ClaudeSession, glyph: String?) {
+        val busy = glyph != null && glyph != IDLE_GLYPH
+        if (busy == session.busy) return
+        if (session.busy && !busy && session.minimized) session.needsAttention = true
+        session.busy = busy
+        publisher.sessionUpdated(session)
+    }
+
+    /** Hides the session from the grid; its process keeps running and it waits in the dock. */
+    fun minimize(session: ClaudeSession) {
+        if (session.minimized || session !in _sessions) return
+        session.minimized = true
+        session.needsAttention = false
+        if (maximizedId == session.id) maximizedId = null
+        if (focusedId == session.id) focusedId = visibleSessions.firstOrNull()?.id
+        persistSessions()
+        publisher.structureChanged()
+        focusedSession?.let { publisher.focusRequested(it) }
+    }
+
+    /** Brings a minimized session back to its grid slot; a dormant one (after a restart) resumes its conversation now. */
+    fun restore(session: ClaudeSession) {
+        if (session !in _sessions) return
+        if (!session.minimized) {
+            focusedId = session.id
+            publisher.focusRequested(session)
+            return
+        }
+        session.minimized = false
+        session.needsAttention = false
+        if (session.isDormant) launch(session, if (session.pickOnResume) StartMode.PICKER else StartMode.RESUME)
+        showStarted(session)
     }
 
     /** Terminates the session and parks it in "Recently closed" so it can be resumed later. */
@@ -172,7 +233,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         if (position < 0) return
         _sessions.removeAt(position)
         if (maximizedId == session.id) maximizedId = null
-        if (focusedId == session.id) focusedId = _sessions.firstOrNull()?.id
+        if (focusedId == session.id) focusedId = visibleSessions.firstOrNull()?.id
         persistSessions()
         park(session, position)
         Disposer.dispose(session)
@@ -221,10 +282,12 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         publisher.focusRequested(session)
     }
 
+    /** Cycles through the visible panes only; minimized sessions are never restored by this. */
     fun focusNext(step: Int) {
-        if (_sessions.isEmpty()) return
-        val index = _sessions.indexOfFirst { it.id == focusedId }.coerceAtLeast(0)
-        val next = _sessions[Math.floorMod(index + step, _sessions.size)]
+        val visible = visibleSessions
+        if (visible.isEmpty()) return
+        val index = visible.indexOfFirst { it.id == focusedId }.coerceAtLeast(0)
+        val next = visible[Math.floorMod(index + step, visible.size)]
         focusedId = next.id
         if (maximizedId != null && maximizedId != next.id) {
             maximizedId = next.id
@@ -249,6 +312,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         it.workDir = workDir
         it.autoName = autoName
         it.pickOnResume = pickOnResume
+        it.minimized = minimized
     }
 
     override fun dispose() {
@@ -258,16 +322,21 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
 
     companion object {
         private val DEFAULT_NAME = Regex("CLAUDE (\\d+)")
-        private val CLAUDE_TITLE = Regex("^[^\\p{L}\\p{N}\\s]\\s+(.+)$")
+        private val CLAUDE_TITLE = Regex("^([^\\p{L}\\p{N}\\s])\\s+(.+)$")
+        private const val IDLE_GLYPH = "\u2733" // ✳
 
         /**
          * Claude Code sets the terminal title to "<status glyph> <conversation title>", e.g. "✳ Fix login bug"
          * (the glyph animates while it works). Its generic start title is "✳ Claude Code". Shell titles have no glyph.
          */
         fun conversationTitle(terminalTitle: String?): String? {
-            val topic = CLAUDE_TITLE.matchEntire(terminalTitle?.trim() ?: return null)?.groupValues?.get(1)?.trim()
+            val topic = CLAUDE_TITLE.matchEntire(terminalTitle?.trim() ?: return null)?.groupValues?.get(2)?.trim()
             return topic?.takeIf { it.isNotEmpty() && it != "Claude Code" }
         }
+
+        /** The leading status glyph of Claude Code's title ("✳" when idle, a spinner frame while working), or null for a shell title. */
+        fun titleGlyph(terminalTitle: String?): String? =
+            CLAUDE_TITLE.matchEntire(terminalTitle?.trim() ?: return null)?.groupValues?.get(1)
 
         fun getInstance(project: Project): ClaudeSessionManager = project.service()
     }

@@ -19,6 +19,8 @@ class SessionState : BaseState() {
     var autoName by property(true)
     /** Started via Claude's own `--resume` picker: the conversation id is unknown, so resuming shows the picker again. */
     var pickOnResume by property(false)
+    /** Only for open sessions: shown in the dock instead of the grid; restored lazily (not started) after a restart. */
+    var minimized by property(false)
     /** Only for recently closed sessions: when it was closed and at which grid position (to reopen it there). */
     var closedAt by property(0L)
     var position by property(-1)
