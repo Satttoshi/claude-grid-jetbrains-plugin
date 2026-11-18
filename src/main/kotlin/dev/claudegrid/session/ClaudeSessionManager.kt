@@ -10,6 +10,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
 import com.intellij.openapi.util.Disposer
 import com.intellij.util.messages.Topic
+import dev.claudegrid.compat.EmbeddedTerminal
 import dev.claudegrid.compat.TerminalCompat
 import dev.claudegrid.state.ClaudeGridState
 import dev.claudegrid.state.LayoutMode
@@ -69,6 +70,9 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     var focusedId: String? = null
 
     val focusedSession: ClaudeSession? get() = visibleSessions.let { v -> v.find { it.id == focusedId } ?: v.firstOrNull() }
+
+    /** Creates the terminal of a session; replaced by a fake in tests. */
+    internal var terminalFactory: (Project, String, String, Map<String, String>) -> EmbeddedTerminal = TerminalCompat::create
 
     private val publisher get() = project.messageBus.syncPublisher(ClaudeGridListener.TOPIC)
 
@@ -190,7 +194,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             ConversationTracker.PANE_ENV to session.id,
             ConversationTracker.DIR_ENV to ConversationTracker.dir.toString(),
         )
-        val terminal = TerminalCompat.create(project, session.workDir, session.name, env)
+        val terminal = terminalFactory(project, session.workDir, session.name, env)
         session.attach(terminal)
         val cmd = (state.claudeCommand?.takeIf { it.isNotBlank() } ?: "claude") +
             " --settings " + shellQuote(ConversationTracker.settingsFile.toString())
@@ -430,7 +434,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             CLAUDE_TITLE.matchEntire(terminalTitle?.trim() ?: return null)?.groupValues?.get(1)
 
         /** Single-quotes [s] for POSIX shells (and fish). */
-        private fun shellQuote(s: String) = "'" + s.replace("'", "'\\''") + "'"
+        internal fun shellQuote(s: String) = "'" + s.replace("'", "'\\''") + "'"
 
         fun getInstance(project: Project): ClaudeSessionManager = project.service()
     }

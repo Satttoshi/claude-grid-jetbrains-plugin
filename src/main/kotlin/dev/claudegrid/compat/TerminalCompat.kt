@@ -32,33 +32,45 @@ object TerminalCompat {
             .createTab()
         // Removes the tab from the Terminal tool window but keeps the process alive; tab.content owns the lifetime.
         manager.detachTab(tab)
-        return EmbeddedTerminal(tab)
+        return ReworkedTerminal(tab)
     }
 }
 
-class EmbeddedTerminal internal constructor(private val tab: TerminalToolWindowTab) : Disposable {
+/** A terminal embedded in a grid pane. An interface so tests can substitute a fake for the real terminal. */
+interface EmbeddedTerminal : Disposable {
     /** Re-parent this freely (layout changes); never recreate the terminal just to move it. */
-    val component: JComponent get() = tab.view.component
-    val preferredFocusableComponent: JComponent get() = tab.view.preferredFocusableComponent
+    val component: JComponent
+    val preferredFocusableComponent: JComponent
 
     /** Queued until the shell has started. */
-    fun executeCommand(command: String) {
+    fun executeCommand(command: String)
+
+    /** Called on the EDT when the shell process exits by itself (not when we dispose it). */
+    fun onTerminated(callback: () -> Unit)
+
+    /**
+     * Called on the EDT with the title the running program sets via OSC 0/2 (e.g. Claude Code's "✳ <topic>").
+     * Stops when this terminal is disposed.
+     */
+    fun onApplicationTitleChanged(callback: (String?) -> Unit)
+}
+
+private class ReworkedTerminal(private val tab: TerminalToolWindowTab) : EmbeddedTerminal {
+    override val component: JComponent get() = tab.view.component
+    override val preferredFocusableComponent: JComponent get() = tab.view.preferredFocusableComponent
+
+    override fun executeCommand(command: String) {
         tab.view.createSendTextBuilder().shouldExecute().send(command)
     }
 
-    /** Called on the EDT when the shell process exits by itself (not when we dispose it). */
-    fun onTerminated(callback: () -> Unit) {
+    override fun onTerminated(callback: () -> Unit) {
         tab.view.coroutineScope.launch(Dispatchers.EDT) {
             tab.view.sessionState.first { it == TerminalViewSessionState.Terminated }
             callback()
         }
     }
 
-    /**
-     * Called on the EDT with the title the running program sets via OSC 0/2 (e.g. Claude Code's "✳ <topic>").
-     * Stops when this terminal is disposed.
-     */
-    fun onApplicationTitleChanged(callback: (String?) -> Unit) {
+    override fun onApplicationTitleChanged(callback: (String?) -> Unit) {
         tab.view.title.addTitleListener(object : TerminalTitleListener {
             override fun onTitleChanged(terminalTitle: TerminalTitle) {
                 val value = terminalTitle.applicationTitle

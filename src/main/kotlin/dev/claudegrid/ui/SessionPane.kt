@@ -39,7 +39,7 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
         }
 
     /** Highlighted while another pane is dragged over this one. */
-    var dropTarget: Boolean = false
+    var dropHighlight: Boolean = false
         set(value) {
             if (field == value) return
             field = value
@@ -114,11 +114,11 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
 
     private fun updateBorder() {
         val color = when {
-            dropTarget -> JBUI.CurrentTheme.DragAndDrop.BORDER_COLOR
+            dropHighlight -> JBUI.CurrentTheme.DragAndDrop.BORDER_COLOR
             focusedPane -> JBUI.CurrentTheme.Focus.focusColor()
             else -> JBColor.border()
         }
-        border = JBUI.Borders.customLine(color, if (focusedPane || dropTarget) 2 else 1)
+        border = JBUI.Borders.customLine(color, if (focusedPane || dropHighlight) 2 else 1)
     }
 
     companion object {

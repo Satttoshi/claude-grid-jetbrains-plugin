@@ -148,15 +148,15 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                 }
                 val over = paneAt(SwingUtilities.convertPoint(e.component, e.point, this@GridPanel))?.takeIf { it !== pane }
                 if (over !== target) {
-                    target?.dropTarget = false
-                    over?.dropTarget = true
+                    target?.dropHighlight = false
+                    over?.dropHighlight = true
                     target = over
                 }
             }
 
             override fun mouseReleased(e: MouseEvent) {
                 val drop = target?.takeIf { dragging }
-                target?.dropTarget = false
+                target?.dropHighlight = false
                 target = null
                 start = null
                 if (dragging) {

@@ -37,6 +37,9 @@ dependencies {
         bundledPlugin("org.jetbrains.plugins.terminal")
         testFramework(TestFrameworkType.Platform)
     }
+    testImplementation("junit:junit:4.13.2")
+    // The platform test framework needs opentest4j at runtime.
+    testImplementation("org.opentest4j:opentest4j:1.3.0")
 }
 
 intellijPlatform {
