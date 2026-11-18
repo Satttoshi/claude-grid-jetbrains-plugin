@@ -48,6 +48,11 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.3.0</h3>
+            <ul>
+              <li>Reload a session to pick up changed settings or MCP servers: Claude restarts and resumes the same conversation.
+                  Available from the pane header, the toolbar and the dock chip menu.</li>
+            </ul>
             <h3>0.2.1</h3>
             <ul>
               <li>Fix the empty grid showing "Nothing to show" instead of the New session / Recently closed screen.</li>
