@@ -17,6 +17,10 @@ import dev.claudegrid.session.ClaudeSession
 import dev.claudegrid.session.ClaudeSessionManager
 import dev.claudegrid.state.LayoutMode
 import java.awt.BorderLayout
+import java.awt.Cursor
+import java.awt.Point
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import java.awt.GridBagLayout
 import java.awt.KeyboardFocusManager
 import java.beans.PropertyChangeListener
@@ -70,7 +74,7 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         // keep those of minimized ones (their terminals keep running); create panes for new ones.
         panes.values.retainAll { pane -> manager.sessions.any { it === pane.session } }
         val sessions = manager.visibleSessions
-        for (s in sessions) panes.getOrPut(s.id) { SessionPane(project, s) }
+        for (s in sessions) panes.getOrPut(s.id) { SessionPane(project, s).also(::installDrag) }
 
         removeAll()
         val ordered = sessions.map { panes.getValue(it.id).also { p -> p.ensureTerminalAttached() } }
@@ -117,6 +121,59 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
         splitter.secondComponent = line(items.subList(mid, items.size), vertical, "$key.1")
         splitter.addPropertyChangeListener("proportion") { manager.saveProportion(key, splitter.proportion) }
         return splitter
+    }
+
+    /**
+     * Dragging a pane's header onto another pane moves it into that pane's slot. Swing keeps delivering the drag
+     * events to the header, so no DnD machinery is needed and the terminals underneath are never touched.
+     */
+    private fun installDrag(pane: SessionPane) {
+        val listener = object : MouseAdapter() {
+            private var start: Point? = null
+            private var dragging = false
+            private var target: SessionPane? = null
+
+            override fun mousePressed(e: MouseEvent) {
+                start = if (SwingUtilities.isLeftMouseButton(e)) e.point else null
+                dragging = false
+            }
+
+            override fun mouseDragged(e: MouseEvent) {
+                val origin = start ?: return
+                if (!dragging) {
+                    if (origin.distance(e.point) < JBUI.scale(DRAG_THRESHOLD)) return
+                    if (manager.maximizedId != null || manager.visibleSessions.size < 2) return
+                    dragging = true
+                    pane.dragHandles.forEach { it.cursor = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR) }
+                }
+                val over = paneAt(SwingUtilities.convertPoint(e.component, e.point, this@GridPanel))?.takeIf { it !== pane }
+                if (over !== target) {
+                    target?.dropTarget = false
+                    over?.dropTarget = true
+                    target = over
+                }
+            }
+
+            override fun mouseReleased(e: MouseEvent) {
+                val drop = target?.takeIf { dragging }
+                target?.dropTarget = false
+                target = null
+                start = null
+                if (dragging) {
+                    dragging = false
+                    pane.dragHandles.forEach { it.cursor = Cursor.getDefaultCursor() }
+                }
+                if (drop != null) manager.move(pane.session, drop.session)
+            }
+        }
+        pane.dragHandles.forEach {
+            it.addMouseListener(listener)
+            it.addMouseMotionListener(listener)
+        }
+    }
+
+    private fun paneAt(point: Point): SessionPane? = panes.values.firstOrNull { pane ->
+        pane.isShowing && SwingUtilities.convertRectangle(pane.parent, pane.bounds, this).contains(point)
     }
 
     /** Shown when no session is open: start a new one, or resume one of the recently closed ones. */
@@ -179,6 +236,7 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
 
     companion object {
         private const val MAX_RECENT_IN_EMPTY_STATE = 5
+        private const val DRAG_THRESHOLD = 5
 
         fun create(project: Project, parent: Disposable): GridPanel = GridPanel(project).also { Disposer.register(parent, it) }
     }

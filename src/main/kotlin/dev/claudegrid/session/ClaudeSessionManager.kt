@@ -309,6 +309,32 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         publisher.focusRequested(session)
     }
 
+    /**
+     * Moves [session] into [target]'s grid slot; the sessions in between shift by one. Minimized sessions keep
+     * their place in the list, so they still come back to their old slot when restored.
+     */
+    fun move(session: ClaudeSession, target: ClaudeSession) {
+        if (session === target || session !in _sessions || target !in _sessions) return
+        val from = _sessions.indexOf(session)
+        val to = _sessions.indexOf(target)
+        _sessions.removeAt(from)
+        // After the removal, target's index dropped by one if it came after session; inserting there places
+        // session behind target (moving forward) or in front of it (moving backward).
+        _sessions.add(if (to > from) _sessions.indexOf(target) + 1 else _sessions.indexOf(target), session)
+        focusedId = session.id
+        persistSessions()
+        publisher.structureChanged()
+        publisher.focusRequested(session)
+    }
+
+    /** Moves [session] one visible slot forward (+1) or backward (-1), wrapping around. */
+    fun moveBy(session: ClaudeSession, step: Int) {
+        val visible = visibleSessions
+        val index = visible.indexOf(session)
+        if (index < 0 || visible.size < 2) return
+        move(session, visible[Math.floorMod(index + step, visible.size)])
+    }
+
     /** Cycles through the visible panes only; minimized sessions are never restored by this. */
     fun focusNext(step: Int) {
         val visible = visibleSessions

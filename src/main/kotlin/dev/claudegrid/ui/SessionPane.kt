@@ -16,13 +16,14 @@ import java.awt.BorderLayout
 import java.awt.FlowLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import javax.swing.JComponent
 import javax.swing.JPanel
 
 /** Header (name, reload, minimize, maximize, close) + the session's embedded terminal. Created once per session and re-parented on layout changes. */
 class SessionPane(private val project: Project, val session: ClaudeSession) : JPanel(BorderLayout()) {
     private val manager get() = ClaudeSessionManager.getInstance(project)
     private val nameLabel = JBLabel(session.name).apply {
-        toolTipText = "Double-click to rename (empty name = follow Claude's conversation title)"
+        toolTipText = "Double-click to rename (empty name = follow Claude's conversation title); drag to move the pane"
         border = JBUI.Borders.emptyLeft(6)
     }
     private val maximizeButton = InplaceButton(
@@ -36,6 +37,19 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
             updateBorder()
             nameLabel.foreground = if (value) UIUtil.getLabelForeground() else UIUtil.getContextHelpForeground()
         }
+
+    /** Highlighted while another pane is dragged over this one. */
+    var dropTarget: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            updateBorder()
+        }
+
+    private val header = JPanel(BorderLayout())
+
+    /** Where a drag starts to reorder panes; [GridPanel] installs the drag listener on these. */
+    val dragHandles: List<JComponent> get() = listOf(header, nameLabel)
 
     var maximized: Boolean = false
         set(value) {
@@ -61,7 +75,7 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
                 manager.close(session)
             })
         }
-        val header = JPanel(BorderLayout()).apply {
+        header.apply {
             border = JBUI.Borders.compound(JBUI.Borders.customLineBottom(JBColor.border()), JBUI.Borders.empty(3, 0))
             add(nameLabel, BorderLayout.CENTER)
             add(buttons, BorderLayout.EAST)
@@ -99,8 +113,12 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
     private fun rename() = promptRename(project, session)
 
     private fun updateBorder() {
-        val color = if (focusedPane) JBUI.CurrentTheme.Focus.focusColor() else JBColor.border()
-        border = JBUI.Borders.customLine(color, if (focusedPane) 2 else 1)
+        val color = when {
+            dropTarget -> JBUI.CurrentTheme.DragAndDrop.BORDER_COLOR
+            focusedPane -> JBUI.CurrentTheme.Focus.focusColor()
+            else -> JBColor.border()
+        }
+        border = JBUI.Borders.customLine(color, if (focusedPane || dropTarget) 2 else 1)
     }
 
     companion object {

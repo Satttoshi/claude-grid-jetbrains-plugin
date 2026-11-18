@@ -110,6 +110,17 @@ class FocusPreviousAction : ClaudeGridAction() {
     }
 }
 
+abstract class MovePaneAction(private val step: Int) : ClaudeGridAction() {
+    override fun isEnabled(manager: ClaudeSessionManager) = manager.visibleSessions.size > 1 && manager.maximizedId == null
+    override fun actionPerformed(e: AnActionEvent) {
+        val manager = e.manager ?: return
+        manager.focusedSession?.let { manager.moveBy(it, step) }
+    }
+}
+
+class MovePaneForwardAction : MovePaneAction(1)
+class MovePaneBackwardAction : MovePaneAction(-1)
+
 abstract class LayoutAction(private val mode: LayoutMode) : DumbAwareToggleAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
     override fun isSelected(e: AnActionEvent): Boolean = e.manager?.layout == mode

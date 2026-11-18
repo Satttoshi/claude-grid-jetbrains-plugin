@@ -83,6 +83,8 @@ class ClaudeGridTerminalAllowedActions : TerminalAllowedActionsProvider {
         "ClaudeGrid.Minimize",
         "ClaudeGrid.FocusNext",
         "ClaudeGrid.FocusPrevious",
+        "ClaudeGrid.MovePaneForward",
+        "ClaudeGrid.MovePaneBackward",
         "ClaudeGrid.OpenGrid",
         "ClaudeGrid.ReopenClosed",
     )

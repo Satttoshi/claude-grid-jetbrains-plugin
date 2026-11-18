@@ -6,6 +6,7 @@ A JetBrains IDE plugin that shows several [Claude Code](https://docs.claude.com/
 
 - Automatic tiling: 1 session fills the view, 2 to 3 sit in columns, 4 or more form a grid. Layout can be switched between Columns, Rows, and Grid without restarting sessions.
 - Resizable panes, maximize/restore of a single pane, focus next/previous pane.
+- Reorder panes by dragging a pane's header onto another pane, or move the focused pane with the keyboard. The order is kept across restarts.
 - Sessions are named after Claude's conversation title automatically; double-click a pane's name to rename it.
 - Per-project persistence: sessions, layout, and splitter proportions are restored after an IDE restart, and each pane resumes its own Claude conversation.
 - Minimize sessions to a dock below the grid: they keep running and come back instantly (no resume). A chip shows a spinner while Claude works and a dot once it finished.
@@ -39,6 +40,7 @@ Open the grid via Tools → Open Claude Grid or the "Claude Grid" tool window on
 | Maximize / Restore Pane | `Ctrl+Alt+Shift+M` |
 | Minimize Session | `Ctrl+Alt+Shift+H` |
 | Focus Next / Previous Pane | `Ctrl+Alt+Shift+]` / `Ctrl+Alt+Shift+[` |
+| Move Pane Forward / Backward | `Ctrl+Alt+Shift+.` / `Ctrl+Alt+Shift+,` |
 | Reopen Closed Session | `Ctrl+Alt+Shift+T` |
 
 ## Development

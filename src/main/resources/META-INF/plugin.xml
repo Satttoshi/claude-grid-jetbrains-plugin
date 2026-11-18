@@ -9,6 +9,7 @@
           <li>Automatic tiling: one session fills the view, two or three sit in columns, four or more form a grid.
               Switch between Columns, Rows and Grid without restarting sessions.</li>
           <li>Resizable panes, maximize/restore a pane, keyboard shortcuts to move between panes.</li>
+          <li>Reorder panes by dragging a pane's header onto another pane, or with keyboard shortcuts.</li>
           <li>Panes are named after Claude's conversation title; double-click a name to rename it.</li>
           <li>Sessions, layout and pane sizes are restored after an IDE restart, and every pane resumes its own conversation.</li>
           <li>Minimize sessions to a dock below the grid: they keep running and come back instantly, with a
@@ -72,6 +73,16 @@
         <action id="ClaudeGrid.FocusPrevious" class="dev.claudegrid.actions.FocusPreviousAction"
                 text="Focus Previous Claude Pane" icon="AllIcons.Actions.Back">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift OPEN_BRACKET"/>
+        </action>
+        <action id="ClaudeGrid.MovePaneForward" class="dev.claudegrid.actions.MovePaneForwardAction"
+                text="Move Claude Pane Forward" description="Swap the focused pane with the next one (drag a pane's header to move it anywhere)"
+                icon="AllIcons.Actions.MoveDown">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift PERIOD"/>
+        </action>
+        <action id="ClaudeGrid.MovePaneBackward" class="dev.claudegrid.actions.MovePaneBackwardAction"
+                text="Move Claude Pane Backward" description="Swap the focused pane with the previous one (drag a pane's header to move it anywhere)"
+                icon="AllIcons.Actions.MoveUp">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift COMMA"/>
         </action>
 
         <action id="ClaudeGrid.ReopenClosed" class="dev.claudegrid.actions.ReopenClosedSessionAction"
