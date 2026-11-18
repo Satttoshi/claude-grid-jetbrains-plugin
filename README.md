@@ -41,3 +41,7 @@ Open the grid via Tools → Open Claude Grid or the "Claude Grid" tool window on
 ./gradlew runIde         # sandbox IDE with the plugin
 ./gradlew verifyPlugin   # compatibility check
 ```
+
+## License
+
+[MIT](LICENSE)
