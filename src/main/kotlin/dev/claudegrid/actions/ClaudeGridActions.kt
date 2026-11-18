@@ -8,7 +8,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import dev.claudegrid.session.ClaudeSessionManager
 import dev.claudegrid.state.LayoutMode
-import dev.claudegrid.ui.ClaudeGridVirtualFile
+import dev.claudegrid.ui.ClaudeGridToolWindowFactory
 
 private val AnActionEvent.manager: ClaudeSessionManager? get() = project?.let { ClaudeSessionManager.getInstance(it) }
 
@@ -24,7 +24,7 @@ abstract class ClaudeGridAction : DumbAwareAction() {
 class OpenGridAction : ClaudeGridAction() {
     override fun isEnabled(manager: ClaudeSessionManager) = true
     override fun actionPerformed(e: AnActionEvent) {
-        ClaudeGridVirtualFile.open(e.project ?: return)
+        ClaudeGridToolWindowFactory.show(e.project ?: return)
     }
 }
 
@@ -40,7 +40,7 @@ class NewSessionAction : ClaudeGridAction() {
             manager.restoreIfNeeded()
             val default = "Claude ${manager.sessions.size + 1}"
             val name = Messages.showInputDialog(project, "Session name:", "New Claude Session", null, default, null) ?: return
-            ClaudeGridVirtualFile.open(project)
+            ClaudeGridToolWindowFactory.show(project)
             manager.createSession(name.trim().ifEmpty { default })
         }
     }

@@ -4,14 +4,16 @@
     <vendor>claude-grid</vendor>
     <description><![CDATA[
         Shows several Claude Code terminal sessions side by side, tiled in columns, rows or a grid,
-        in an editor tab. Sessions are restored (and their conversations resumed) after an IDE restart.
+        in a sidebar tool window. Sessions are restored (and their conversations resumed) after an IDE restart.
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <fileEditorProvider implementation="dev.claudegrid.ui.ClaudeGridEditorProvider"/>
+        <toolWindow id="Claude Grid" anchor="right" icon="/icons/claudeGrid.svg"
+                    factoryClass="dev.claudegrid.ui.ClaudeGridToolWindowFactory"
+                    doNotActivateOnStart="true"/>
         <notificationGroup id="Claude Grid" displayType="BALLOON"/>
     </extensions>
 
@@ -22,7 +24,7 @@
     <actions>
         <action id="ClaudeGrid.OpenGrid" class="dev.claudegrid.actions.OpenGridAction"
                 text="Open Claude Grid" description="Show all Claude Code sessions side by side"
-                icon="AllIcons.Actions.SplitVertically">
+                icon="/icons/claudeGrid.svg">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift C"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
