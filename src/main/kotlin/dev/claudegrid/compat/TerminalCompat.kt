@@ -78,6 +78,7 @@ class ClaudeGridTerminalAllowedActions : TerminalAllowedActionsProvider {
     override fun getActionIds(): List<String> = listOf(
         "ClaudeGrid.NewSession",
         "ClaudeGrid.CloseSession",
+        "ClaudeGrid.ReloadSession",
         "ClaudeGrid.ToggleMaximize",
         "ClaudeGrid.Minimize",
         "ClaudeGrid.FocusNext",

@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.project.DumbAware
+import com.intellij.openapi.ui.Messages
 import com.intellij.util.text.DateFormatUtil
 import dev.claudegrid.state.SessionState
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -55,6 +56,31 @@ class CloseSessionAction : ClaudeGridAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val manager = e.manager ?: return
         manager.focusedSession?.let(manager::close)
+    }
+}
+
+class ReloadSessionAction : ClaudeGridAction() {
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        ClaudeSessionManager.getInstance(project).focusedSession?.let { reload(project, it) }
+    }
+
+    companion object {
+        /** Restarts claude with the same conversation (picks up changed config, MCP servers, plugins); asks first while Claude is working. */
+        fun reload(project: Project, session: ClaudeSession) {
+            if (session.busy) {
+                val answer = Messages.showYesNoDialog(
+                    project,
+                    "Claude is still working in \"${session.name}\". Reloading stops the current turn. Reload anyway?",
+                    "Reload Claude Session",
+                    "Reload",
+                    "Cancel",
+                    Messages.getQuestionIcon(),
+                )
+                if (answer != Messages.YES) return
+            }
+            ClaudeSessionManager.getInstance(project).reload(session)
+        }
     }
 }
 

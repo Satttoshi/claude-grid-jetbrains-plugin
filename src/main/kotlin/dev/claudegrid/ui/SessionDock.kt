@@ -10,6 +10,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.WrapLayout
+import dev.claudegrid.actions.ReloadSessionAction
 import dev.claudegrid.session.ClaudeSession
 import dev.claudegrid.session.ClaudeSessionManager
 import java.awt.Component
@@ -36,7 +37,7 @@ class SessionDock(private val project: Project) : JPanel(WrapLayout(FlowLayout.L
 
     fun rebuild(sessions: List<ClaudeSession>) {
         removeAll()
-        chips.keys.retainAll(sessions.map { it.id }.toSet())
+        chips.values.retainAll { chip -> sessions.any { it === chip.session } }
         for (s in sessions) add(chips.getOrPut(s.id) { Chip(s) }.also { it.refresh() })
         isVisible = sessions.isNotEmpty()
         revalidate()
@@ -47,7 +48,7 @@ class SessionDock(private val project: Project) : JPanel(WrapLayout(FlowLayout.L
         chips[session.id]?.refresh()
     }
 
-    private inner class Chip(private val session: ClaudeSession) : JBLabel() {
+    private inner class Chip(val session: ClaudeSession) : JBLabel() {
         init {
             border = JBUI.Borders.compound(RoundedLineBorder(JBColor.border(), JBUI.scale(10)), JBUI.Borders.empty(2, 8))
             iconTextGap = JBUI.scale(5)
@@ -65,6 +66,12 @@ class SessionDock(private val project: Project) : JPanel(WrapLayout(FlowLayout.L
             JBPopupMenu().apply {
                 add(JMenuItem("Restore", AllIcons.General.ExpandComponent).apply { addActionListener { manager.restore(session) } })
                 add(JMenuItem("Rename…").apply { addActionListener { SessionPane.promptRename(project, session) } })
+                if (!session.isDormant) {
+                    add(JMenuItem("Reload", AllIcons.Actions.Restart).apply {
+                        toolTipText = "Stop Claude now; it resumes with fresh config when restored"
+                        addActionListener { ReloadSessionAction.reload(project, session) }
+                    })
+                }
                 addSeparator()
                 add(JMenuItem("Close", AllIcons.Actions.Close).apply { addActionListener { manager.close(session) } })
             }.show(e.component, e.x, e.y)

@@ -13,6 +13,7 @@
           <li>Sessions, layout and pane sizes are restored after an IDE restart, and every pane resumes its own conversation.</li>
           <li>Minimize sessions to a dock below the grid: they keep running and come back instantly, with a
               spinner while Claude works and a dot when it finished.</li>
+          <li>Reload a session to pick up changed settings or MCP servers; it restarts Claude and resumes the same conversation.</li>
           <li>Reopen recently closed sessions, or resume any conversation through Claude's picker.</li>
         </ul>
         <p>Requires the <code>claude</code> CLI on your <code>PATH</code>.</p>
@@ -49,6 +50,10 @@
         <action id="ClaudeGrid.CloseSession" class="dev.claudegrid.actions.CloseSessionAction"
                 text="Close Claude Session" description="Terminate the focused Claude session"
                 icon="AllIcons.Actions.Cancel"/>
+        <action id="ClaudeGrid.ReloadSession" class="dev.claudegrid.actions.ReloadSessionAction"
+                text="Reload Claude Session"
+                description="Restart claude in the focused pane with the same conversation, e.g. after changing settings or MCP servers"
+                icon="AllIcons.Actions.Restart"/>
         <action id="ClaudeGrid.Minimize" class="dev.claudegrid.actions.MinimizeSessionAction"
                 text="Minimize Claude Session"
                 description="Hide the focused session in the dock; it keeps running and can be restored instantly"
@@ -97,6 +102,7 @@
         <group id="ClaudeGrid.Toolbar">
             <reference ref="ClaudeGrid.NewSession"/>
             <reference ref="ClaudeGrid.ResumeMenu"/>
+            <reference ref="ClaudeGrid.ReloadSession"/>
             <reference ref="ClaudeGrid.CloseSession"/>
             <separator/>
             <reference ref="ClaudeGrid.Layout.Columns"/>

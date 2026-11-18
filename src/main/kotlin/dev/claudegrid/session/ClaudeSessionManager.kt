@@ -227,6 +227,33 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         showStarted(session)
     }
 
+    /**
+     * Restarts the session's `claude` process with the same conversation id, so changed settings, MCP servers etc.
+     * take effect. The session is replaced by a fresh object in the same slot (the old one, its terminal and its
+     * callbacks are disposed); name, maximize and minimize state are kept. A minimized session becomes dormant
+     * and resumes when restored.
+     */
+    fun reload(session: ClaudeSession): ClaudeSession? {
+        val position = _sessions.indexOf(session)
+        if (position < 0) return null
+        val fresh = ClaudeSession(session.id, session.name, session.workDir, pickOnResume = session.pickOnResume).also {
+            it.autoName = session.autoName
+            it.minimized = session.minimized
+        }
+        // Kill the old process first so the old and the new claude never write the same conversation at once.
+        _sessions.removeAt(position)
+        Disposer.dispose(session)
+        add(fresh, position)
+        if (!fresh.minimized) launch(fresh, if (fresh.pickOnResume) StartMode.PICKER else StartMode.RESUME)
+        persistSessions()
+        publisher.structureChanged()
+        if (!fresh.minimized) {
+            focusedId = fresh.id
+            publisher.focusRequested(fresh)
+        }
+        return fresh
+    }
+
     /** Terminates the session and parks it in "Recently closed" so it can be resumed later. */
     fun close(session: ClaudeSession) {
         val position = _sessions.indexOf(session)

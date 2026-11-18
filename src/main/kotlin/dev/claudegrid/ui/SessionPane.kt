@@ -9,6 +9,7 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import dev.claudegrid.actions.ReloadSessionAction
 import dev.claudegrid.session.ClaudeSession
 import dev.claudegrid.session.ClaudeSessionManager
 import java.awt.BorderLayout
@@ -17,7 +18,7 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JPanel
 
-/** Header (name, minimize, maximize, close) + the session's embedded terminal. Created once per session and re-parented on layout changes. */
+/** Header (name, reload, minimize, maximize, close) + the session's embedded terminal. Created once per session and re-parented on layout changes. */
 class SessionPane(private val project: Project, val session: ClaudeSession) : JPanel(BorderLayout()) {
     private val manager get() = ClaudeSessionManager.getInstance(project)
     private val nameLabel = JBLabel(session.name).apply {
@@ -49,6 +50,9 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
     init {
         val buttons = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0)).apply {
             isOpaque = false
+            add(InplaceButton(IconButton("Reload Session (restart claude with the same conversation, e.g. after config or MCP changes)", AllIcons.Actions.Restart)) {
+                ReloadSessionAction.reload(project, session)
+            })
             add(InplaceButton(IconButton("Minimize (keeps running)", AllIcons.General.HideToolWindow)) {
                 manager.minimize(session)
             })

@@ -66,8 +66,9 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
     }
 
     fun rebuild() {
-        // Forget panes of closed sessions; keep those of minimized ones (their terminals keep running); create panes for new ones.
-        panes.keys.retainAll(manager.sessions.map { it.id }.toSet())
+        // Forget panes of closed or reloaded sessions (a reload keeps the id but replaces the session object);
+        // keep those of minimized ones (their terminals keep running); create panes for new ones.
+        panes.values.retainAll { pane -> manager.sessions.any { it === pane.session } }
         val sessions = manager.visibleSessions
         for (s in sessions) panes.getOrPut(s.id) { SessionPane(project, s) }
 
