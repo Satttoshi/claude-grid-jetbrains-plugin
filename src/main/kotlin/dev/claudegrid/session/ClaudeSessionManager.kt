@@ -1,14 +1,17 @@
 package dev.claudegrid.session
 
+import com.intellij.execution.process.UnixProcessManager
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.util.messages.Topic
 import dev.claudegrid.compat.EmbeddedTerminal
 import dev.claudegrid.compat.TerminalCompat
@@ -16,6 +19,7 @@ import dev.claudegrid.state.ClaudeGridState
 import dev.claudegrid.state.LayoutMode
 import dev.claudegrid.state.SessionState
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 interface ClaudeGridListener {
     /** Sessions were added/removed, or layout/maximize changed: the grid must rebuild its splitters. */
@@ -270,10 +274,35 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
      * take effect. The session is replaced by a fresh object in the same slot (the old one, its terminal and its
      * callbacks are disposed); name, maximize and minimize state are kept. A minimized session becomes dormant
      * and resumes when restored.
+     *
+     * The old claude is first asked to quit (SIGINT, which Claude Code handles as a clean exit with status 0, so the
+     * `||` fallback of the launch command does not run) and given [GRACEFUL_STOP_SECONDS] to do so. Killing it right
+     * away skips its shutdown, e.g. Remote Control would stay bound to the dead process and the new one could not
+     * reconnect.
      */
-    fun reload(session: ClaudeSession): ClaudeSession? {
+    fun reload(session: ClaudeSession) {
+        if (session !in _sessions || !reloading.add(session.id)) return
+        val claude = if (session.isDormant) null else ConversationTracker.claudeProcess(session.id)
+        if (claude == null || !SystemInfo.isUnix) {
+            reloading.remove(session.id)
+            replace(session)
+            return
+        }
+        UnixProcessManager.sendSignal(claude.pid().toInt(), UnixProcessManager.SIGINT)
+        claude.onExit().completeOnTimeout(claude, GRACEFUL_STOP_SECONDS, TimeUnit.SECONDS).thenRun {
+            ApplicationManager.getApplication().invokeLater({
+                reloading.remove(session.id)
+                if (session in _sessions) replace(session)
+            }, project.disposed)
+        }
+    }
+
+    /** Session ids whose old claude is shutting down for a reload; a second reload meanwhile is ignored. */
+    private val reloading = mutableSetOf<String>()
+
+    private fun replace(session: ClaudeSession) {
         val position = _sessions.indexOf(session)
-        if (position < 0) return null
+        if (position < 0) return
         syncConversation(session)
         val fresh = ClaudeSession(session.id, session.name, session.workDir, session.conversationId).also {
             it.autoName = session.autoName
@@ -290,7 +319,6 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             focusedId = fresh.id
             publisher.focusRequested(fresh)
         }
-        return fresh
     }
 
     /** Terminates the session and parks it in "Recently closed" so it can be resumed later. */
@@ -419,6 +447,9 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         private val DEFAULT_NAME = Regex("CLAUDE (\\d+)")
         private val CLAUDE_TITLE = Regex("^([^\\p{L}\\p{N}\\s])\\s+(.+)$")
         private const val IDLE_GLYPH = "\u2733" // ✳
+
+        /** How long a reload waits for the old claude to shut down cleanly before killing it. */
+        private const val GRACEFUL_STOP_SECONDS = 5L
 
         /**
          * Claude Code sets the terminal title to "<status glyph> <conversation title>", e.g. "✳ Fix login bug"

@@ -13,7 +13,8 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Every pane starts claude with `--settings <[settingsFile]>`, which adds a `SessionStart` hook (fired on startup,
  * resume, clear and compact). The hook writes Claude's hook input, which contains `session_id`, to
- * `<[dir]>/<pane id>.json`. Only that one claude launch is affected; no settings file of the user is changed.
+ * `<[dir]>/<pane id>.json`, and the pid of the `claude` process (the hook shell's parent) to `<pane id>.pid`.
+ * Only that one claude launch is affected; no settings file of the user is changed.
  */
 object ConversationTracker {
     /** Env vars the hook reads; set in each pane's terminal. */
@@ -52,11 +53,44 @@ object ConversationTracker {
         }
     }
 
+    /**
+     * The pane's running `claude` process, as reported by its SessionStart hook, or null if unknown or gone.
+     * Only a live process named like claude that started before the report counts, so a reused pid is never returned.
+     */
+    fun claudeProcess(paneId: String): ProcessHandle? {
+        val file = dir.resolve("$paneId.pid")
+        return try {
+            if (!Files.isRegularFile(file)) return null
+            val reported = Files.getLastModifiedTime(file).toInstant()
+            val pid = Files.readString(file).trim().toLongOrNull() ?: return null
+            ProcessHandle.of(pid).orElse(null)?.takeIf { process ->
+                process.isAlive && isClaude(process.info()) &&
+                    process.info().startInstant().map { !it.isAfter(reported) }.orElse(false)
+            }
+        } catch (e: Exception) {
+            LOG.debug("Cannot read claude pid of pane $paneId", e)
+            null
+        }
+    }
+
+    /**
+     * The native build lives in `.../claude/versions/<version>` or is called `claude`; the npm package runs as
+     * `node .../@anthropic-ai/claude-code/cli.js`. Only the executable and the script are checked, not the whole
+     * command line, which may mention "claude" for other reasons (e.g. a classpath).
+     */
+    private fun isClaude(info: ProcessHandle.Info): Boolean {
+        val exe = info.command().orElse("")
+        if (exe.split('/', '\\').any { it.equals("claude", ignoreCase = true) || it.startsWith("claude.", ignoreCase = true) }) return true
+        val script = info.arguments().orElse(emptyArray()).firstOrNull() ?: return false
+        return script.contains("claude-code", ignoreCase = true)
+    }
+
     /** Deletes what the hook wrote for a pane that is gone for good. */
     fun forget(paneId: String) {
         cache.remove(paneId)
         try {
             Files.deleteIfExists(dir.resolve("$paneId.json"))
+            Files.deleteIfExists(dir.resolve("$paneId.pid"))
         } catch (e: Exception) {
             LOG.debug("Cannot delete conversation file of pane $paneId", e)
         }
@@ -67,9 +101,11 @@ object ConversationTracker {
 
     private fun hookSettings(): String {
         val target = "\"\$$DIR_ENV/\$$PANE_ENV.json\""
+        val pidFile = "\"\$$DIR_ENV/\$$PANE_ENV.pid\""
         // Write via a temp file so the IDE never reads a half-written file; always exit 0 so Claude reports no hook error.
+        // The hook's shell is a child of claude, so $PPID is claude's pid (lets a reload stop claude gracefully).
         val command = "if [ -n \"\$$PANE_ENV\" ] && [ -d \"\$$DIR_ENV\" ]; then " +
-            "cat > $target.tmp && mv -f $target.tmp $target; fi; true"
+            "cat > $target.tmp && mv -f $target.tmp $target; echo \"\$PPID\" > $pidFile; fi; true"
         return """{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":${jsonString(command)}}]}]}}"""
     }
 

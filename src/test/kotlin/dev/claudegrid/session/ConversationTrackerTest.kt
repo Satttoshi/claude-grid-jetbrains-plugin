@@ -94,6 +94,9 @@ class ConversationTrackerTest : BasePlatformTestCase() {
 
         assertEquals(conversation, ConversationTracker.conversationId(pane))
         assertFalse(Files.exists(ConversationTracker.dir.resolve("$pane.json.tmp")))
+        // The hook records its parent's pid (claude in real use; here the test JVM, which is not named like claude).
+        assertEquals(ProcessHandle.current().pid().toString(), Files.readString(ConversationTracker.dir.resolve("$pane.pid")).trim())
+        assertNull(ConversationTracker.claudeProcess(pane))
     }
 
     fun `test hook command is a no-op outside a grid pane`() {
