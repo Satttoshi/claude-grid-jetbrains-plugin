@@ -51,6 +51,11 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.3.2</h3>
+            <ul>
+              <li>Fix Remote Control staying linked to the old session after a reload: Claude now shuts down cleanly
+                  before it is restarted.</li>
+            </ul>
             <h3>0.3.1</h3>
             <ul>
               <li>Reorder panes: drag a pane's header onto another pane, or move the focused pane with
