@@ -51,6 +51,12 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.3.3</h3>
+            <ul>
+              <li>After <code>/clear</code> or <code>/resume</code> a pane no longer keeps the old conversation's title;
+                  it shows a default name until Claude titles the new conversation.</li>
+              <li>Pane names are easier to read; the focused pane's name is bold.</li>
+            </ul>
             <h3>0.3.2</h3>
             <ul>
               <li>Fix Remote Control staying linked to the old session after a reload: Claude now shuts down cleanly
