@@ -7,6 +7,7 @@ import com.intellij.ui.InplaceButton
 import com.intellij.openapi.ui.popup.IconButton
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
+import com.intellij.util.ui.JBFont
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import dev.claudegrid.actions.ReloadSessionAction
@@ -35,7 +36,7 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
             if (field == value) return
             field = value
             updateBorder()
-            nameLabel.foreground = if (value) UIUtil.getLabelForeground() else UIUtil.getContextHelpForeground()
+            updateNameStyle()
         }
 
     /** Highlighted while another pane is dragged over this one. */
@@ -92,7 +93,13 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
         add(session.requireTerminal.component, BorderLayout.CENTER)
         focusedPane = false
         updateBorder()
-        nameLabel.foreground = UIUtil.getContextHelpForeground()
+        updateNameStyle()
+    }
+
+    /** The name always uses the normal label color so it stays readable; the focused pane's name is bold. */
+    private fun updateNameStyle() {
+        nameLabel.foreground = UIUtil.getLabelForeground()
+        nameLabel.font = JBFont.label().let { if (focusedPane) it.asBold() else it }
     }
 
     fun refresh() {

@@ -216,8 +216,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             // Claude retitles the terminal on start, /resume and /clear: a good moment to look for a conversation switch.
             syncConversation(session)
             updateActivity(session, titleGlyph(title))
-            val topic = conversationTitle(title) ?: return@onApplicationTitleChanged
-            if (session.autoName) applyName(session, topic)
+            if (session.autoName) followTitle(session, title)
         }
         terminal.onTerminated {
             // The shell exited (e.g. `exit`): drop the pane. Ignore terminations caused by the project closing.
@@ -230,8 +229,22 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         if (session.isDormant) return
         val reported = ConversationTracker.conversationId(session.id) ?: return
         if (reported == session.conversationId) return
+        val switched = session.conversationId != null
         session.conversationId = reported
+        if (switched && session.autoName) {
+            // The old title belongs to the old conversation: fall back to a default name until Claude titles the new one.
+            session.outdatedTitle = session.name
+            applyName(session, nextDefaultName())
+        }
         persistSessions()
+    }
+
+    /** Names an auto-named session after Claude's conversation title; Claude's generic "Claude Code" title is skipped. */
+    private fun followTitle(session: ClaudeSession, terminalTitle: String?) {
+        val topic = conversationTitle(terminalTitle) ?: return
+        if (topic == session.outdatedTitle) return
+        session.outdatedTitle = null
+        applyName(session, topic)
     }
 
     /** Tracks whether Claude is working; finishing while minimized flags the dock chip. */

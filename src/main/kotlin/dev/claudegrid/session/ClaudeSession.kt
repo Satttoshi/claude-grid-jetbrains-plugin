@@ -30,6 +30,12 @@ class ClaudeSession(
     var autoName: Boolean = true
         internal set
 
+    /**
+     * The title of the conversation this pane left (via `/clear` or `/resume`). Claude may keep reporting it for a
+     * moment after the switch; it is ignored until Claude reports a different title.
+     */
+    internal var outdatedTitle: String? = null
+
     /** Hidden from the grid and shown as a chip in the dock; the process (if started) keeps running. */
     var minimized: Boolean = false
         internal set
