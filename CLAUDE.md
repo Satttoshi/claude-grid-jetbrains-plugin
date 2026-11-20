@@ -23,6 +23,10 @@ Tests: plain JUnit 4 for pure functions (`ClaudeTitleTest`), `BasePlatformTestCa
 
 Working rule: after every change run `./gradlew buildPlugin test`, then ask the user to test via `./gradlew runIde`.
 
+## Commits
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<optional scope>): <description>`, with the description in the imperative mood and lower case, e.g. `fix(session): stop claude gracefully before reload`. Common types: `feat`, `fix`, `docs`, `test`, `refactor`, `build`, `ci`, `chore`. Mark breaking changes with `!` after the type/scope or a `BREAKING CHANGE:` footer.
+
 ## Build environment
 
 - Target: IntelliJ IDEA 2026.2.3 (build 262), `since-build` 262, no `until-build`.
