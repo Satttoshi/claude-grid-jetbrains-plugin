@@ -1,6 +1,5 @@
 package dev.claudegrid.session
 
-import com.intellij.execution.process.UnixProcessManager
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -8,6 +7,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
 import com.intellij.openapi.util.Disposer
@@ -301,12 +301,24 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             replace(session)
             return
         }
-        UnixProcessManager.sendSignal(claude.pid().toInt(), UnixProcessManager.SIGINT)
+        interrupt(claude)
         claude.onExit().completeOnTimeout(claude, GRACEFUL_STOP_SECONDS, TimeUnit.SECONDS).thenRun {
             ApplicationManager.getApplication().invokeLater({
                 reloading.remove(session.id)
                 if (session in _sessions) replace(session)
             }, project.disposed)
+        }
+    }
+
+    /** Sends SIGINT via the system `kill` (the platform's signal helper is internal API); the reload's timeout covers a failure. */
+    private fun interrupt(process: ProcessHandle) {
+        try {
+            ProcessBuilder("kill", "-INT", process.pid().toString())
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+        } catch (e: Exception) {
+            LOG.debug("Cannot send SIGINT to claude (pid ${process.pid()})", e)
         }
     }
 
@@ -457,6 +469,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
     }
 
     companion object {
+        private val LOG = logger<ClaudeSessionManager>()
         private val DEFAULT_NAME = Regex("CLAUDE (\\d+)")
         private val CLAUDE_TITLE = Regex("^([^\\p{L}\\p{N}\\s])\\s+(.+)$")
         private const val IDLE_GLYPH = "\u2733" // ✳
