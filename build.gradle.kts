@@ -51,6 +51,10 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.3.4</h3>
+            <ul>
+              <li>Reload no longer uses internal IDE API to stop Claude.</li>
+            </ul>
             <h3>0.3.3</h3>
             <ul>
               <li>After <code>/clear</code> or <code>/resume</code> a pane no longer keeps the old conversation's title;
