@@ -99,10 +99,13 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
         refresh()
     }
 
-    /** The name always uses the normal label color so it stays readable; the focused pane's name is bold. */
+    /**
+     * The name reads as a heading: a bit larger than the terminal text and always in the normal label color;
+     * the focused pane's name is bold.
+     */
     private fun updateNameStyle() {
         nameLabel.foreground = UIUtil.getLabelForeground()
-        nameLabel.font = JBFont.label().let { if (focusedPane) it.asBold() else it }
+        nameLabel.font = JBFont.label().biggerOn(NAME_FONT_BOOST).let { if (focusedPane) it.asBold() else it }
     }
 
     fun refresh() {
@@ -138,6 +141,8 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
     companion object {
         /** The mark of a session the user resolved; also used by the dock. */
         val DONE_ICON = AllIcons.General.InspectionsOK
+        /** Points added to the label font for the session name. */
+        private const val NAME_FONT_BOOST = 3f
         private const val DONE_TOOLTIP = "Mark as Done"
         private const val NOT_DONE_TOOLTIP = "Mark as Not Done"
 
