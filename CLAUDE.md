@@ -43,7 +43,7 @@ Package `dev.claudegrid`:
 - **`session/ClaudeSession`**: one session (UUID pane id, `conversationId`, name, workDir, `autoName`) owning its terminal; disposed via `Disposer`.
 - **`session/ConversationTracker`**: learns each pane's current conversation id from a `SessionStart` hook (see below).
 - **`ui/GridPanel`**: builds nested `JBSplitter`s from the session list and `LayoutMode`. A rebuild creates new splitters only and **re-parents existing `SessionPane`s**; never recreate or dispose a terminal widget to change layout, because that kills the running `claude` process. Maximize hides other panes without disposing them. Also tracks the focused pane via the AWT focus owner. Reordering: dragging a pane header onto another pane calls `ClaudeSessionManager.move` (plain mouse listeners on the header, no Swing DnD); the order of `sessions` is the grid order and is persisted.
-- **`ui/SessionPane`**: header (name, reload, minimize, maximize, close; double-click to rename, drag to reorder) plus the embedded terminal component.
+- **`ui/SessionPane`**: header (name, done, reload, minimize, maximize, close; double-click to rename, drag to reorder) plus the embedded terminal component.
 - **`ui/SessionDock`**: strip below the grid with a chip per minimized session (click restores, right-click for Restore/Rename/Close).
 - **`ui/ClaudeGridToolWindowFactory`**: the only grid host. Only one host may exist at a time since hosts re-parent the same terminal components (the earlier editor-tab host was removed, see commit 7f286aa).
 - **`state/ClaudeGridState`**: `SimplePersistentStateComponent` stored in the workspace file: open sessions, recently closed sessions (with grid position, capped at `MAX_CLOSED`), layout, splitter proportions keyed by `"<layout>:<count>:<path>"`, and the claude command. Restore happens lazily when the grid is first opened, not at IDE startup.
@@ -56,6 +56,10 @@ Package `dev.claudegrid`:
 - After an IDE restart a minimized session is restored **dormant** (`ClaudeSession.terminal == null`) and only runs `claude --resume` when first restored. Visible sessions always have a terminal.
 - The dock chip reflects Claude's title glyph: a spinner while working (`busy`), a dot when Claude finished while minimized (`needsAttention`).
 - **Closed**: terminated and parked in "Recently closed" (resume via `--resume`).
+
+### Done mark
+
+`ClaudeSession.done` is a manual, purely visual flag ("this session is resolved"): a green check next to the pane name and on the dock chip, toggled via the header button, the chip's context menu or `ClaudeGrid.ToggleDone`. Only the user changes it (Claude's activity never clears it); it is persisted and survives restart, reload and close/reopen.
 
 ### Terminal API (Reworked Terminal, `@ApiStatus.Experimental`)
 

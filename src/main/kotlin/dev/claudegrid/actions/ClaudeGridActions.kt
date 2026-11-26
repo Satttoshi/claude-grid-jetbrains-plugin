@@ -19,6 +19,8 @@ import dev.claudegrid.session.ClaudeSession
 import dev.claudegrid.session.ClaudeSessionManager
 import dev.claudegrid.state.LayoutMode
 import dev.claudegrid.ui.ClaudeGridToolWindowFactory
+import dev.claudegrid.ui.SessionPane
+import com.intellij.util.ui.EmptyIcon
 
 private val AnActionEvent.manager: ClaudeSessionManager? get() = project?.let { ClaudeSessionManager.getInstance(it) }
 
@@ -95,6 +97,18 @@ class MinimizeSessionAction : ClaudeGridAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val manager = e.manager ?: return
         manager.focusedSession?.let(manager::minimize)
+    }
+}
+
+class ToggleDoneAction : ClaudeGridAction() {
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        e.presentation.text = if (e.manager?.focusedSession?.done == true) "Mark Claude Session as Not Done" else "Mark Claude Session as Done"
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val manager = e.manager ?: return
+        manager.focusedSession?.let(manager::toggleDone)
     }
 }
 
@@ -189,7 +203,7 @@ private class RestoreMinimizedAction(private val session: ClaudeSession) : DumbA
     init {
         templatePresentation.setText(session.name, false)
         templatePresentation.description = session.workDir
-        templatePresentation.icon = AllIcons.General.HideToolWindow
+        templatePresentation.icon = if (session.done) SessionPane.DONE_ICON else AllIcons.General.HideToolWindow
         templatePresentation.putClientProperty(
             ActionUtil.SECONDARY_TEXT,
             when {
@@ -213,6 +227,8 @@ private class ResumeClosedAction(private val id: String, s: SessionState) : Dumb
     init {
         templatePresentation.setText(s.name ?: "Claude", false)
         templatePresentation.description = s.workDir
+        // An empty icon keeps the names aligned with those of the sessions marked as done.
+        templatePresentation.icon = if (s.done) SessionPane.DONE_ICON else EmptyIcon.ICON_16
         templatePresentation.putClientProperty(ActionUtil.SECONDARY_TEXT, describe(s))
     }
 

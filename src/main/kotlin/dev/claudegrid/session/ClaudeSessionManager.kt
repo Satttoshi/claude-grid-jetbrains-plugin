@@ -25,7 +25,7 @@ interface ClaudeGridListener {
     /** Sessions were added/removed, or layout/maximize changed: the grid must rebuild its splitters. */
     fun structureChanged() {}
 
-    /** A session's name, busy state or attention flag changed. */
+    /** A session's name, busy state, attention flag or done mark changed. */
     fun sessionUpdated(session: ClaudeSession) {}
 
     /** Move keyboard focus to this session's terminal. */
@@ -107,6 +107,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
                 start(id, name, workDir, conversationId, resume = true)
             }
             session.autoName = s.autoName
+            session.done = s.done
         }
         if (_sessions.isNotEmpty()) publisher.structureChanged()
     }
@@ -145,6 +146,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
             index = closed.position.takeIf { it >= 0 } ?: _sessions.size,
         )
         session.autoName = closed.autoName
+        session.done = closed.done
         showStarted(session)
         return session
     }
@@ -332,6 +334,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         val fresh = ClaudeSession(session.id, session.name, session.workDir, session.conversationId).also {
             it.autoName = session.autoName
             it.minimized = session.minimized
+            it.done = session.done
         }
         // Kill the old process first so the old and the new claude never write the same conversation at once.
         _sessions.removeAt(position)
@@ -397,6 +400,16 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         publisher.sessionUpdated(session)
     }
 
+    /** Marks the session as resolved (or not); only the user changes this, Claude's activity never does. */
+    fun setDone(session: ClaudeSession, done: Boolean) {
+        if (session !in _sessions || session.done == done) return
+        session.done = done
+        persistSessions()
+        publisher.sessionUpdated(session)
+    }
+
+    fun toggleDone(session: ClaudeSession) = setDone(session, !session.done)
+
     fun toggleMaximize(session: ClaudeSession) {
         maximizedId = if (maximizedId == session.id) null else session.id
         publisher.structureChanged()
@@ -461,6 +474,7 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         it.conversationId = conversationId
         it.pickOnResume = conversationId == null
         it.minimized = minimized
+        it.done = done
     }
 
     override fun dispose() {

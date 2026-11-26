@@ -203,8 +203,8 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                 val row = JPanel(BorderLayout(JBUI.scale(8), 0)).apply {
                     isOpaque = false
                     add(ActionLink(s.name ?: "Claude") { manager.reopen(id) }.apply {
-                        setIcon(AllIcons.Vcs.History)
-                        toolTipText = "Resume this conversation"
+                        setIcon(if (s.done) SessionPane.DONE_ICON else AllIcons.Vcs.History)
+                        toolTipText = if (s.done) "Marked as done; resume this conversation" else "Resume this conversation"
                     }, BorderLayout.WEST)
                     add(JBLabel(describeClosedSession(s)).apply { foreground = UIUtil.getContextHelpForeground() }, BorderLayout.CENTER)
                 }

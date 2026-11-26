@@ -20,13 +20,14 @@ import java.awt.event.MouseEvent
 import javax.swing.JComponent
 import javax.swing.JPanel
 
-/** Header (name, reload, minimize, maximize, close) + the session's embedded terminal. Created once per session and re-parented on layout changes. */
+/** Header (name, done, reload, minimize, maximize, close) + the session's embedded terminal. Created once per session and re-parented on layout changes. */
 class SessionPane(private val project: Project, val session: ClaudeSession) : JPanel(BorderLayout()) {
     private val manager get() = ClaudeSessionManager.getInstance(project)
     private val nameLabel = JBLabel(session.name).apply {
         toolTipText = "Double-click to rename (empty name = follow Claude's conversation title); drag to move the pane"
         border = JBUI.Borders.emptyLeft(6)
     }
+    private val doneButton = InplaceButton(IconButton(DONE_TOOLTIP, AllIcons.Actions.Checked)) { manager.toggleDone(session) }
     private val maximizeButton = InplaceButton(
         IconButton("Maximize / Restore", AllIcons.General.ExpandComponent, AllIcons.General.ExpandComponentHover)
     ) { manager.toggleMaximize(session) }
@@ -65,6 +66,7 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
     init {
         val buttons = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0)).apply {
             isOpaque = false
+            add(doneButton)
             add(InplaceButton(IconButton("Reload Session (restart claude with the same conversation, e.g. after config or MCP changes)", AllIcons.Actions.Restart)) {
                 ReloadSessionAction.reload(project, session)
             })
@@ -94,6 +96,7 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
         focusedPane = false
         updateBorder()
         updateNameStyle()
+        refresh()
     }
 
     /** The name always uses the normal label color so it stays readable; the focused pane's name is bold. */
@@ -104,6 +107,10 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
 
     fun refresh() {
         nameLabel.text = session.name
+        nameLabel.icon = if (session.done) DONE_ICON else null
+        doneButton.setIcons(if (session.done) DONE_ICON else AllIcons.Actions.Checked, null, null)
+        doneButton.toolTipText = if (session.done) NOT_DONE_TOOLTIP else DONE_TOOLTIP
+        doneButton.repaint()
     }
 
     /** The terminal component may have been moved elsewhere (e.g. the pane was rebuilt); make sure it's ours. */
@@ -129,6 +136,11 @@ class SessionPane(private val project: Project, val session: ClaudeSession) : JP
     }
 
     companion object {
+        /** The mark of a session the user resolved; also used by the dock. */
+        val DONE_ICON = AllIcons.General.InspectionsOK
+        private const val DONE_TOOLTIP = "Mark as Done"
+        private const val NOT_DONE_TOOLTIP = "Mark as Not Done"
+
         fun promptRename(project: Project, session: ClaudeSession) {
             val newName = Messages.showInputDialog(project, "Session name:", "Rename Claude Session", null, session.name, null)
             if (newName != null) ClaudeSessionManager.getInstance(project).rename(session, newName.trim())

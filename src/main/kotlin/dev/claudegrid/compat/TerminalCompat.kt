@@ -93,6 +93,7 @@ class ClaudeGridTerminalAllowedActions : TerminalAllowedActionsProvider {
         "ClaudeGrid.ReloadSession",
         "ClaudeGrid.ToggleMaximize",
         "ClaudeGrid.Minimize",
+        "ClaudeGrid.ToggleDone",
         "ClaudeGrid.FocusNext",
         "ClaudeGrid.FocusPrevious",
         "ClaudeGrid.MovePaneForward",

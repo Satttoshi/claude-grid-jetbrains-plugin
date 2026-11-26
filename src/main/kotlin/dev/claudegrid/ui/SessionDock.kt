@@ -72,6 +72,9 @@ class SessionDock(private val project: Project) : JPanel(WrapLayout(FlowLayout.L
                         addActionListener { ReloadSessionAction.reload(project, session) }
                     })
                 }
+                add(JMenuItem(if (session.done) "Mark as Not Done" else "Mark as Done", AllIcons.Actions.Checked).apply {
+                    addActionListener { manager.toggleDone(session) }
+                })
                 addSeparator()
                 add(JMenuItem("Close", AllIcons.Actions.Close).apply { addActionListener { manager.close(session) } })
             }.show(e.component, e.x, e.y)
@@ -80,19 +83,19 @@ class SessionDock(private val project: Project) : JPanel(WrapLayout(FlowLayout.L
         fun refresh() {
             text = session.name
             icon = when {
-                session.isDormant -> null
                 session.busy -> AnimatedIcon.Default.INSTANCE
                 session.needsAttention -> AttentionDot
+                session.done -> SessionPane.DONE_ICON
                 else -> null
             }
             font = font.deriveFont(if (session.needsAttention) Font.BOLD else Font.PLAIN)
             foreground = if (session.isDormant) UIUtil.getContextHelpForeground() else UIUtil.getLabelForeground()
             toolTipText = when {
-                session.isDormant -> "Not running; resumes the conversation when restored"
-                session.busy -> "Claude is working; click to restore"
-                session.needsAttention -> "Claude finished while minimized; click to restore"
-                else -> "Running; click to restore"
-            } + " (right-click for more)"
+                session.isDormant -> "Not running; resumes the conversation when restored."
+                session.busy -> "Claude is working; click to restore."
+                session.needsAttention -> "Claude finished while minimized; click to restore."
+                else -> "Running; click to restore."
+            } + (if (session.done) " Marked as done." else "") + " (right-click for more)"
         }
     }
 

@@ -29,6 +29,8 @@ class SessionState : BaseState() {
     var pickOnResume by property(false)
     /** Only for open sessions: shown in the dock instead of the grid; restored lazily (not started) after a restart. */
     var minimized by property(false)
+    /** The user marked the session as done (resolved); kept when it is closed and reopened. */
+    var done by property(false)
     /** Only for recently closed sessions: when it was closed and at which grid position (to reopen it there). */
     var closedAt by property(0L)
     var position by property(-1)

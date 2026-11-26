@@ -14,6 +14,7 @@
           <li>Sessions, layout and pane sizes are restored after an IDE restart, and every pane resumes its own conversation.</li>
           <li>Minimize sessions to a dock below the grid: they keep running and come back instantly, with a
               spinner while Claude works and a dot when it finished.</li>
+          <li>Mark a session as done to see at a glance which ones are resolved.</li>
           <li>Reload a session to pick up changed settings or MCP servers; it restarts Claude and resumes the same conversation.</li>
           <li>Reopen recently closed sessions, or resume any conversation through Claude's picker.</li>
         </ul>
@@ -60,6 +61,12 @@
                 description="Hide the focused session in the dock; it keeps running and can be restored instantly"
                 icon="AllIcons.General.HideToolWindow">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift H"/>
+        </action>
+        <action id="ClaudeGrid.ToggleDone" class="dev.claudegrid.actions.ToggleDoneAction"
+                text="Mark Claude Session as Done"
+                description="Mark the focused session as done (resolved), or remove the mark"
+                icon="AllIcons.Actions.Checked">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift D"/>
         </action>
         <action id="ClaudeGrid.ToggleMaximize" class="dev.claudegrid.actions.ToggleMaximizeAction"
                 text="Maximize / Restore Pane" description="Toggle the focused pane to fill the grid"

@@ -48,6 +48,10 @@ class ClaudeSession(
     var needsAttention: Boolean = false
         internal set
 
+    /** Marked by the user as resolved; purely a visual marker (a check in the pane header and on the dock chip). */
+    var done: Boolean = false
+        internal set
+
     var terminal: EmbeddedTerminal? = null
         private set
 
