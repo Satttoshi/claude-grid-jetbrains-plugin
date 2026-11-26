@@ -51,6 +51,13 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.4.0</h3>
+            <ul>
+              <li>Mark a session as done: a check button in the pane header (or <code>Ctrl+Alt+Shift+D</code>) puts a
+                  green check on the pane, its dock chip and its entry in the recently closed list. The mark is kept
+                  across restarts, reloads and close/reopen.</li>
+              <li>Session names are larger, so they read as a heading above the terminal.</li>
+            </ul>
             <h3>0.3.4</h3>
             <ul>
               <li>Reload no longer uses internal IDE API to stop Claude.</li>
