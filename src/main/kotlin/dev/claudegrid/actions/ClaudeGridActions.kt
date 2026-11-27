@@ -4,6 +4,9 @@ import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.project.DumbAware
@@ -17,10 +20,14 @@ import com.intellij.openapi.project.Project
 import com.intellij.icons.AllIcons
 import dev.claudegrid.session.ClaudeSession
 import dev.claudegrid.session.ClaudeSessionManager
+import dev.claudegrid.state.ClaudeGridState
 import dev.claudegrid.state.LayoutMode
 import dev.claudegrid.ui.ClaudeGridToolWindowFactory
 import dev.claudegrid.ui.SessionPane
 import com.intellij.util.ui.EmptyIcon
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 private val AnActionEvent.manager: ClaudeSessionManager? get() = project?.let { ClaudeSessionManager.getInstance(it) }
 
@@ -172,6 +179,68 @@ class ClearRecentlyClosedAction : ClaudeGridAction() {
     }
 }
 
+/** Searchable popup with every closed session, grouped by the day it was closed. */
+class ShowAllClosedSessionsAction : ClaudeGridAction() {
+    override fun isEnabled(manager: ClaudeSessionManager) = manager.closedSessions.isNotEmpty()
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        val count = e.manager?.closedSessions?.size ?: 0
+        e.presentation.setText(if (count > 0) "All Closed Sessions ($count)…" else "All Closed Sessions…", false)
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        show(e.project ?: return)
+    }
+
+    companion object {
+        private const val MAX_ROWS = 25
+
+        fun show(project: Project) {
+            val closed = ClaudeSessionManager.getInstance(project).closedSessions
+            if (closed.isEmpty()) return
+            val group = DefaultActionGroup()
+            for ((day, sessions) in groupClosedByDay(closed)) {
+                group.addSeparator(day)
+                for (s in sessions) {
+                    val id = s.id ?: continue
+                    group.add(ResumeClosedAction(id, s, ResumeClosedAction.describe(s, timeOnly = true)))
+                }
+            }
+            JBPopupFactory.getInstance().createActionGroupPopup(
+                "Closed Claude Sessions", group, SimpleDataContext.getProjectContext(project),
+                JBPopupFactory.ActionSelectionAid.SPEEDSEARCH, false, null, MAX_ROWS,
+            ).showCenteredInCurrentWindow(project)
+        }
+    }
+}
+
+/**
+ * Splits closed sessions (most recent first) into "Today", "Yesterday" and one group per earlier date, keeping the
+ * order. Sessions without a close time end up in a last group "Earlier".
+ */
+fun groupClosedByDay(
+    closed: List<SessionState>,
+    today: LocalDate = LocalDate.now(),
+    zone: ZoneId = ZoneId.systemDefault(),
+): List<Pair<String, List<SessionState>>> {
+    val groups = LinkedHashMap<String, MutableList<SessionState>>()
+    val undated = mutableListOf<SessionState>()
+    for (s in closed) {
+        if (s.closedAt <= 0) {
+            undated += s
+            continue
+        }
+        val label = when (Instant.ofEpochMilli(s.closedAt).atZone(zone).toLocalDate()) {
+            today -> "Today"
+            today.minusDays(1) -> "Yesterday"
+            else -> DateFormatUtil.formatDate(s.closedAt)
+        }
+        groups.getOrPut(label) { mutableListOf() } += s
+    }
+    if (undated.isNotEmpty()) groups["Earlier"] = undated
+    return groups.map { it.key to it.value }
+}
+
 /** Dropdown next to "+": minimized sessions, recently closed sessions, Claude's own picker, clear. */
 class ResumeSessionGroup : ActionGroup(), DumbAware {
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
@@ -179,7 +248,8 @@ class ResumeSessionGroup : ActionGroup(), DumbAware {
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         val manager = e?.manager ?: return AnAction.EMPTY_ARRAY
         val am = ActionManager.getInstance()
-        val closed = manager.closedSessions.mapNotNull { s -> s.id?.let { ResumeClosedAction(it, s) } }
+        val all = manager.closedSessions
+        val closed = all.take(ClaudeGridState.MAX_CLOSED_IN_MENU).mapNotNull { s -> s.id?.let { ResumeClosedAction(it, s) } }
         val minimized = manager.minimizedSessions.map { RestoreMinimizedAction(it) }
         return buildList {
             if (minimized.isNotEmpty()) {
@@ -191,6 +261,8 @@ class ResumeSessionGroup : ActionGroup(), DumbAware {
             } else {
                 add(Separator.create("Recently Closed"))
                 addAll(closed)
+                // The menu only shows the newest ones; the rest is reachable through the searchable popup.
+                if (all.size > ClaudeGridState.MAX_CLOSED_IN_MENU) add(am.getAction("ClaudeGrid.ShowAllClosed"))
             }
             add(Separator.create())
             add(am.getAction("ClaudeGrid.ResumeWithPicker"))
@@ -223,13 +295,17 @@ private class RestoreMinimizedAction(private val session: ClaudeSession) : DumbA
     }
 }
 
-private class ResumeClosedAction(private val id: String, s: SessionState) : DumbAwareAction() {
+private class ResumeClosedAction(
+    private val id: String,
+    s: SessionState,
+    secondaryText: String = describe(s),
+) : DumbAwareAction() {
     init {
         templatePresentation.setText(s.name ?: "Claude", false)
         templatePresentation.description = s.workDir
         // An empty icon keeps the names aligned with those of the sessions marked as done.
         templatePresentation.icon = if (s.done) SessionPane.DONE_ICON else EmptyIcon.ICON_16
-        templatePresentation.putClientProperty(ActionUtil.SECONDARY_TEXT, describe(s))
+        templatePresentation.putClientProperty(ActionUtil.SECONDARY_TEXT, secondaryText)
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
@@ -240,10 +316,14 @@ private class ResumeClosedAction(private val id: String, s: SessionState) : Dumb
     }
 
     companion object {
-        /** "idle-game · 5 minutes ago" */
-        fun describe(s: SessionState): String {
+        /** "idle-game · 5 minutes ago", or "idle-game · 14:05" where the day is shown elsewhere. */
+        fun describe(s: SessionState, timeOnly: Boolean = false): String {
             val folder = s.workDir?.let { java.io.File(it).name }.orEmpty()
-            val time = if (s.closedAt > 0) DateFormatUtil.formatPrettyDateTime(s.closedAt) else ""
+            val time = when {
+                s.closedAt <= 0 -> ""
+                timeOnly -> DateFormatUtil.formatTime(s.closedAt)
+                else -> DateFormatUtil.formatPrettyDateTime(s.closedAt)
+            }
             return listOf(folder, time).filter { it.isNotEmpty() }.joinToString(" · ")
         }
     }

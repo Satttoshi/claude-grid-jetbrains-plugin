@@ -11,6 +11,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import dev.claudegrid.actions.NewSessionAction
+import dev.claudegrid.actions.ShowAllClosedSessionsAction
 import dev.claudegrid.actions.describeClosedSession
 import dev.claudegrid.session.ClaudeGridListener
 import dev.claudegrid.session.ClaudeSession
@@ -209,6 +210,10 @@ class GridPanel(private val project: Project) : JPanel(BorderLayout()), Disposab
                     add(JBLabel(describeClosedSession(s)).apply { foreground = UIUtil.getContextHelpForeground() }, BorderLayout.CENTER)
                 }
                 addItem(row, top = 6)
+            }
+            val total = manager.closedSessions.size
+            if (total > recent.size) {
+                addItem(ActionLink("All closed sessions ($total)…") { ShowAllClosedSessionsAction.show(project) }, top = 6)
             }
         }
         addItem(ActionLink("Resume with Claude's picker…") { manager.createSession(pickFromClaude = true) }.apply {

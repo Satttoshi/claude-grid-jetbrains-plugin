@@ -51,7 +51,11 @@ class GridState : BaseState() {
 @State(name = "ClaudeGrid", storages = [Storage(StoragePathMacros.WORKSPACE_FILE)])
 class ClaudeGridState : SimplePersistentStateComponent<GridState>(GridState()) {
     companion object {
-        const val MAX_CLOSED = 20
+        /** Entries are tiny (a few ids and strings), so the history is kept generously. */
+        const val MAX_CLOSED = 1000
+
+        /** The resume dropdown lists only the newest ones; "All Closed Sessions" shows the rest. */
+        const val MAX_CLOSED_IN_MENU = 20
 
         fun getInstance(project: Project): ClaudeGridState = project.service()
     }

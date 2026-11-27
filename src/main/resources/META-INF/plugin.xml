@@ -101,6 +101,9 @@
                 text="Resume with Claude's Picker…"
                 description="Open a pane running 'claude --resume' to pick any conversation"
                 icon="AllIcons.Actions.Search"/>
+        <action id="ClaudeGrid.ShowAllClosed" class="dev.claudegrid.actions.ShowAllClosedSessionsAction"
+                text="All Closed Claude Sessions…"
+                description="Search all closed Claude sessions, grouped by day, and resume one"/>
         <action id="ClaudeGrid.ClearRecentlyClosed" class="dev.claudegrid.actions.ClearRecentlyClosedAction"
                 text="Clear Recently Closed"
                 description="Forget the recently closed list (Claude's conversations are kept)"/>
