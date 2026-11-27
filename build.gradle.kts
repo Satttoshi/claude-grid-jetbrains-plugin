@@ -51,6 +51,12 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.5.0</h3>
+            <ul>
+              <li>The recently closed list keeps 1000 sessions instead of 20.</li>
+              <li>The resume menu shows the newest 20; the new "All Closed Sessions" entry opens the full list,
+                  grouped by day, where you can type to filter.</li>
+            </ul>
             <h3>0.4.0</h3>
             <ul>
               <li>Mark a session as done: a check button in the pane header (or <code>Ctrl+Alt+Shift+D</code>) puts a
