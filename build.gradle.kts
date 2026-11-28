@@ -51,6 +51,11 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.5.1</h3>
+            <ul>
+              <li>Windows: resuming, reloading and reopening a session now works in PowerShell (including Windows
+                  PowerShell 5.1) and cmd terminals.</li>
+            </ul>
             <h3>0.5.0</h3>
             <ul>
               <li>The recently closed list keeps 1000 sessions instead of 20.</li>
