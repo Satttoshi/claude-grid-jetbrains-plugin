@@ -202,14 +202,16 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         )
         val terminal = terminalFactory(project, session.workDir, session.name, env)
         session.attach(terminal)
+        // The command is typed into the user's shell, so it has to be spelled for that shell (e.g. no `||` in PowerShell 5.1).
+        val shell = ShellSyntax.of(terminal.shellPath)
         val cmd = (state.claudeCommand?.takeIf { it.isNotBlank() } ?: "claude") +
-            " --settings " + shellQuote(ConversationTracker.settingsFile.toString())
+            " --settings " + shell.quote(ConversationTracker.settingsFile.toString())
         val conversation = session.conversationId
         terminal.executeCommand(
             when {
                 conversation == null -> "$cmd --resume"
                 // --resume fails if the conversation was never written (no prompt sent yet); then start fresh with the same id.
-                resume -> "$cmd --resume $conversation || $cmd --session-id $conversation"
+                resume -> shell.orElse("$cmd --resume $conversation", "$cmd --session-id $conversation")
                 else -> "$cmd --session-id $conversation"
             }
         )
@@ -503,9 +505,6 @@ class ClaudeSessionManager(private val project: Project) : Disposable {
         /** The leading status glyph of Claude Code's title ("✳" when idle, a spinner frame while working), or null for a shell title. */
         fun titleGlyph(terminalTitle: String?): String? =
             CLAUDE_TITLE.matchEntire(terminalTitle?.trim() ?: return null)?.groupValues?.get(1)
-
-        /** Single-quotes [s] for POSIX shells (and fish). */
-        internal fun shellQuote(s: String) = "'" + s.replace("'", "'\\''") + "'"
 
         fun getInstance(project: Project): ClaudeSessionManager = project.service()
     }

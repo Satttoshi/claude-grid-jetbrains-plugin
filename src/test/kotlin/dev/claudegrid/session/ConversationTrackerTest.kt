@@ -2,7 +2,9 @@ package dev.claudegrid.session
 
 import com.google.gson.JsonParser
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.openapi.util.SystemInfo
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.attribute.FileTime
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -84,7 +86,7 @@ class ConversationTrackerTest : BasePlatformTestCase() {
             .getAsJsonArray("hooks")[0].asJsonObject.get("command").asString
         val conversation = UUID.randomUUID().toString()
 
-        val process = ProcessBuilder("/bin/sh", "-c", command).apply {
+        val process = ProcessBuilder(hookShell() ?: return, "-c", command).apply {
             environment()[ConversationTracker.PANE_ENV] = pane
             environment()[ConversationTracker.DIR_ENV] = ConversationTracker.dir.toString()
         }.start()
@@ -95,15 +97,29 @@ class ConversationTrackerTest : BasePlatformTestCase() {
         assertEquals(conversation, ConversationTracker.conversationId(pane))
         assertFalse(Files.exists(ConversationTracker.dir.resolve("$pane.json.tmp")))
         // The hook records its parent's pid (claude in real use; here the test JVM, which is not named like claude).
-        assertEquals(ProcessHandle.current().pid().toString(), Files.readString(ConversationTracker.dir.resolve("$pane.pid")).trim())
+        // Git Bash on Windows reports an MSYS pid instead, which never passes as a claude process either.
+        if (!SystemInfo.isWindows) {
+            assertEquals(ProcessHandle.current().pid().toString(), Files.readString(ConversationTracker.dir.resolve("$pane.pid")).trim())
+        }
         assertNull(ConversationTracker.claudeProcess(pane))
+    }
+
+    /**
+     * The shell Claude Code runs hooks in: `sh`, on Windows Git Bash (not `System32\bash.exe`, which is WSL).
+     * Null if Windows has no Git Bash; the hook tests are skipped then.
+     */
+    private fun hookShell(): String? {
+        if (!SystemInfo.isWindows) return "/bin/sh"
+        val roots = listOf("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA").mapNotNull(System::getenv)
+        return roots.flatMap { listOf("$it\\Git\\bin\\bash.exe", "$it\\Programs\\Git\\bin\\bash.exe") }
+            .firstOrNull { Files.isRegularFile(Path.of(it)) }
     }
 
     fun `test hook command is a no-op outside a grid pane`() {
         val json = JsonParser.parseString(Files.readString(ConversationTracker.settingsFile)).asJsonObject
         val command = json.getAsJsonObject("hooks").getAsJsonArray("SessionStart")[0].asJsonObject
             .getAsJsonArray("hooks")[0].asJsonObject.get("command").asString
-        val process = ProcessBuilder("/bin/sh", "-c", command).apply {
+        val process = ProcessBuilder(hookShell() ?: return, "-c", command).apply {
             environment().remove(ConversationTracker.PANE_ENV)
             environment().remove(ConversationTracker.DIR_ENV)
         }.start()

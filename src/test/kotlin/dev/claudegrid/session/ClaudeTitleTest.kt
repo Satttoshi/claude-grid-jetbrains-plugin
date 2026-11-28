@@ -1,13 +1,12 @@
 package dev.claudegrid.session
 
 import dev.claudegrid.session.ClaudeSessionManager.Companion.conversationTitle
-import dev.claudegrid.session.ClaudeSessionManager.Companion.shellQuote
 import dev.claudegrid.session.ClaudeSessionManager.Companion.titleGlyph
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Parsing of Claude Code's terminal title and shell quoting; pure functions, no IDE needed. */
+/** Parsing of Claude Code's terminal title; pure functions, no IDE needed. */
 class ClaudeTitleTest {
     @Test
     fun `conversation title is the text after the status glyph`() {
@@ -46,16 +45,5 @@ class ClaudeTitleTest {
         assertNull(titleGlyph(null))
         assertNull(titleGlyph("zsh"))
         assertNull(titleGlyph("vim file.txt"))
-    }
-
-    @Test
-    fun `shell quote wraps in single quotes`() {
-        assertEquals("'/path/with space/x.json'", shellQuote("/path/with space/x.json"))
-    }
-
-    @Test
-    fun `shell quote escapes embedded single quotes`() {
-        assertEquals("'it'\\''s'", shellQuote("it's"))
-        assertEquals("'\$HOME \"x\"'", shellQuote("\$HOME \"x\""))
     }
 }

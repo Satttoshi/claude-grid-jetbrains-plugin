@@ -14,6 +14,9 @@ import com.intellij.terminal.frontend.view.TerminalViewSessionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.intellij.openapi.diagnostic.ControlFlowException
+import com.intellij.openapi.diagnostic.logger
+import org.jetbrains.plugins.terminal.TerminalProjectOptionsProvider
 import javax.swing.JComponent
 
 /**
@@ -32,8 +35,19 @@ object TerminalCompat {
             .createTab()
         // Removes the tab from the Terminal tool window but keeps the process alive; tab.content owns the lifetime.
         manager.detachTab(tab)
-        return ReworkedTerminal(tab)
+        return ReworkedTerminal(tab, shellPath(project))
     }
+
+    /** The shell new terminal tabs start (Settings | Tools | Terminal | Shell path), or null if it cannot be told. */
+    private fun shellPath(project: Project): String? = try {
+        TerminalProjectOptionsProvider.getInstance(project).shellPath
+    } catch (e: Exception) {
+        if (e is ControlFlowException) throw e
+        LOG.debug("Cannot read the terminal's shell path", e)
+        null
+    }
+
+    private val LOG = logger<TerminalCompat>()
 }
 
 /** A terminal embedded in a grid pane. An interface so tests can substitute a fake for the real terminal. */
@@ -41,6 +55,9 @@ interface EmbeddedTerminal : Disposable {
     /** Re-parent this freely (layout changes); never recreate the terminal just to move it. */
     val component: JComponent
     val preferredFocusableComponent: JComponent
+
+    /** The shell this terminal runs (may carry arguments), or null if unknown; decides how commands are spelled. */
+    val shellPath: String?
 
     /** Queued until the shell has started. */
     fun executeCommand(command: String)
@@ -55,7 +72,7 @@ interface EmbeddedTerminal : Disposable {
     fun onApplicationTitleChanged(callback: (String?) -> Unit)
 }
 
-private class ReworkedTerminal(private val tab: TerminalToolWindowTab) : EmbeddedTerminal {
+private class ReworkedTerminal(private val tab: TerminalToolWindowTab, override val shellPath: String?) : EmbeddedTerminal {
     override val component: JComponent get() = tab.view.component
     override val preferredFocusableComponent: JComponent get() = tab.view.preferredFocusableComponent
 

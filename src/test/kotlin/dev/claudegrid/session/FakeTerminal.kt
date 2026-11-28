@@ -5,7 +5,9 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 
 /** Stands in for the real terminal: records commands and lets tests fire title changes and termination. */
-class FakeTerminal(val workDir: String, val name: String, val env: Map<String, String>) : EmbeddedTerminal {
+class FakeTerminal(
+    val workDir: String, val name: String, val env: Map<String, String>, override val shellPath: String? = "/bin/zsh",
+) : EmbeddedTerminal {
     override val component: JComponent = JPanel()
     override val preferredFocusableComponent: JComponent get() = component
 
